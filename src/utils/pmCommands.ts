@@ -1,43 +1,9 @@
-export type PackageManager = "pnpm" | "npm" | "yarn" | "bun";
-
-export function installCommand(pm: PackageManager) {
-  switch (pm) {
-    case "npm":
-      return "npm install";
-    case "yarn":
-      return "yarn";
-    case "bun":
-      return "bun install";
-    case "pnpm":
-    default:
-      return "pnpm install";
-  }
-}
-
-export function devCommand(pm: PackageManager) {
-  switch (pm) {
-    case "npm":
-      return "npm run dev";
-    case "yarn":
-      return "yarn dev";
-    case "bun":
-      return "bun run dev";
-    case "pnpm":
-    default:
-      return "pnpm dev";
-  }
-}
-
-export function execArgs(pm: PackageManager, script: string) {
-  switch (pm) {
-    case "npm":
-      return ["run", script];
-    case "yarn":
-      return [script];
-    case "bun":
-      return ["run", script];
-    case "pnpm":
-    default:
-      return [script];
-  }
-}
+/**
+ * @deprecated This module now just re-exports "@helix/core". Import from
+ * "@helix/core" directly instead. Kept as a backward-compatible shim during
+ * the Phase 2 core-extraction migration (see
+ * docs/migration/phase-2-core-extraction.md) and will be removed once all
+ * internal and third-party call sites have moved off it.
+ */
+export { devCommand, execArgs, installCommand } from "@helix/core";
+export type { PackageManager } from "@helix/core";

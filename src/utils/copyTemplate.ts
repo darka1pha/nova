@@ -1,20 +1,8 @@
-import fs from "fs-extra";
-import path from "node:path";
-
 /**
- * Copies every file from `srcDir` into `destDir`, creating directories as
- * needed. Used both for the base template and for each selected addon
- * overlay, so addons can simply "win" by copying after the base.
+ * @deprecated This module now just re-exports "@helix/core". Import from
+ * "@helix/core" directly instead. Kept as a backward-compatible shim during
+ * the Phase 2 core-extraction migration (see
+ * docs/migration/phase-2-core-extraction.md) and will be removed once all
+ * internal and third-party call sites have moved off it.
  */
-export async function copyTemplateDir(srcDir: string, destDir: string) {
-  await fs.ensureDir(destDir);
-  await fs.copy(srcDir, destDir, { overwrite: true, errorOnExist: false });
-}
-
-export async function pathExists(filePath: string) {
-  return fs.pathExists(filePath);
-}
-
-export function joinAddon(addonsRoot: string, name: string) {
-  return path.join(addonsRoot, name);
-}
+export { copyTemplateDir, joinAddon, pathExists } from "@helix/core";

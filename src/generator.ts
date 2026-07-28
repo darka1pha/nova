@@ -1,11 +1,10 @@
+import { copyTemplateDir, devCommand, installCommand } from "@helix/core";
 import fs from "fs-extra";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildPackageJson } from "./packageManifest.js";
 import type { Answers, FeatureFlags, FeatureKey, GenerateProjectOptions, UiLibrary } from "./types.js";
-import { copyTemplateDir } from "./utils/copyTemplate.js";
-import { devCommand, installCommand } from "./utils/pmCommands.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_ROOT = path.join(__dirname, "..", "templates");
@@ -14,6 +13,9 @@ const ADDONS_DIR = path.join(TEMPLATES_ROOT, "addons");
 const UI_DIR = path.join(TEMPLATES_ROOT, "ui");
 
 // Maps feature flags -> addon overlay folder name (skipped when false).
+// NOTE: this is the informal "plugin registry" that Phase 4 (plugin loader)
+// replaces with a real registry populated by plugins registering themselves,
+// so new features stop requiring an edit here.
 const ADDON_FOLDERS: Record<FeatureKey, string> = {
   prisma: "prisma",
   betterAuth: "better-auth",

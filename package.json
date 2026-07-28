@@ -6,6 +6,9 @@
   "bin": {
     "helix": "./bin/helix.js"
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "files": [
     "bin",
     "dist",
@@ -16,11 +19,11 @@
     "node": ">=18.18.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build --workspace=@helix/core && tsc",
     "dev": "tsx ./src/index.ts",
     "prepack": "npm run build",
     "start": "npm run build && node ./bin/helix.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "npm run typecheck --workspace=@helix/core && tsc --noEmit"
   },
   "keywords": [
     "nextjs",
@@ -39,6 +42,7 @@
   ],
   "dependencies": {
     "@clack/prompts": "^0.8.2",
+    "@helix/core": "^0.1.0",
     "execa": "^9.5.1",
     "fs-extra": "^11.2.0",
     "picocolors": "^1.1.1"

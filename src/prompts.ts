@@ -1,8 +1,8 @@
+import { bail, type PackageManager } from "@helix/core";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 
 import type { Answers, FeatureKey, UiLibrary } from "./types.js";
-import type { PackageManager } from "./utils/pmCommands.js";
 
 export async function collectAnswers(cliProjectName?: string): Promise<Answers> {
   p.intro(pc.bgCyan(pc.black(" create-enterprise-next ")));
@@ -112,11 +112,4 @@ export async function collectAnswers(cliProjectName?: string): Promise<Answers> 
       openapi: featureSet.has("openapi"),
     },
   };
-}
-
-function bail<T>(value: T | symbol): asserts value is T {
-  if (p.isCancel(value)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
 }

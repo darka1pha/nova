@@ -1,4 +1,4 @@
-import type { PackageManager } from "./utils/pmCommands.js";
+import type { PackageManager } from "@helix/core";
 
 export type FeatureKey =
   | "prisma"

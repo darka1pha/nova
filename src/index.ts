@@ -1,10 +1,10 @@
+import { devCommand, installCommand } from "@helix/core";
 import * as p from "@clack/prompts";
 import { execa } from "execa";
 import pc from "picocolors";
 
 import { generateProject } from "./generator.js";
 import { collectAnswers } from "./prompts.js";
-import { devCommand, installCommand } from "./utils/pmCommands.js";
 
 export async function run() {
   const cliProjectName = process.argv[2] && !process.argv[2].startsWith("-") ? process.argv[2] : undefined;

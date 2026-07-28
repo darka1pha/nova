@@ -1,0 +1,28 @@
+{
+  "name": "@helix/core",
+  "version": "0.1.0",
+  "description": "Framework-agnostic shared utilities for the Helix ecosystem: filesystem/template copying, package-manager command resolution, prompt cancel-handling, and logging. Contains zero feature-specific logic — see docs/migration/phase-2-core-extraction.md.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.8.2",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "license": "MIT"
+}

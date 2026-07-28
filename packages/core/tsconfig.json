@@ -11,11 +11,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
-    "sourceMap": true,
-    "paths": {
-      "@helix/core": ["./packages/core/src/index.ts"],
-      "@helix/core/*": ["./packages/core/src/*"]
-    }
+    "sourceMap": true
   },
   "include": ["src/**/*.ts"]
 }
