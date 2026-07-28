@@ -33,6 +33,15 @@ async function request<T>(
   path: string,
   config: ApiRequestConfig = {},
 ): Promise<T> {
+  // Interceptors may rewrite the path and/or config before the request is
+  // built. Both the resolved path and resolved config must be used below —
+  // previously this discarded any interceptor changes and leaked an
+  // internal "__resolvedUrl" marker into the fetch() options via spread.
+  const { url: resolvedPath, config: resolvedConfig } = await runRequestInterceptors(
+    path,
+    config,
+  );
+
   const {
     params,
     json,
@@ -40,9 +49,9 @@ async function request<T>(
     retries = DEFAULT_RETRIES,
     skipAuth,
     ...init
-  } = await resolveConfig(path, config);
+  } = resolvedConfig;
 
-  const url = buildUrl(path, params);
+  const url = buildUrl(resolvedPath, params);
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   if (json !== undefined) headers.set("Content-Type", "application/json");
@@ -110,11 +119,6 @@ async function request<T>(
   throw lastError instanceof Error
     ? new ApiError({ message: lastError.message, status: 0 })
     : new ApiError({ message: "Unknown network error", status: 0 });
-}
-
-async function resolveConfig(path: string, config: ApiRequestConfig) {
-  const { url, config: nextConfig } = await runRequestInterceptors(path, config);
-  return { ...nextConfig, __resolvedUrl: url } as ApiRequestConfig & { __resolvedUrl: string };
 }
 
 function backoff(attempt: number) {

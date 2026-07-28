@@ -1,6 +1,7 @@
 "use server";
 
 import type { AuthResult } from "@/features/auth/types";
+import { getUserLocale } from "@/i18n/locale";
 import { redirect } from "@/i18n/navigation";
 import { setTokens } from "@/lib/auth/token-store";
 import { loginSchema } from "@/lib/validations/auth";
@@ -38,6 +39,10 @@ export async function loginAction(_prevState: AuthResult, formData: FormData): P
     return { success: false, error: "auth.errors.invalidCredentials" };
   }
 
-  redirect({ href: "/dashboard", locale: "en" });
+  // Redirect within the user's current locale rather than hardcoding "en",
+  // which would silently bounce non-English users (e.g. "fa") over to the
+  // English site right after they log in.
+  const locale = await getUserLocale();
+  redirect({ href: "/dashboard", locale });
   return { success: true };
 }
