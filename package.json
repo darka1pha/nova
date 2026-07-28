@@ -1,0 +1,61 @@
+{
+  "name": "helix",
+  "version": "1.0.0",
+  "description": "Helix is an extensible Next.js development toolkit for creating, generating, managing, and maintaining production-ready applications.",
+  "type": "module",
+  "bin": {
+    "helix": "./bin/helix.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "templates",
+    "plugins"
+  ],
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx ./src/index.ts",
+    "prepack": "npm run build",
+    "start": "npm run build && node ./bin/helix.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "nextjs",
+    "next.js",
+    "react",
+    "typescript",
+    "cli",
+    "scaffold",
+    "generator",
+    "codegen",
+    "developer-tools",
+    "framework",
+    "starter",
+    "template",
+    "plugin-system"
+  ],
+  "dependencies": {
+    "@clack/prompts": "^0.8.2",
+    "execa": "^9.5.1",
+    "fs-extra": "^11.2.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/helix"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/helix#readme",
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/helix/issues"
+  }
+}

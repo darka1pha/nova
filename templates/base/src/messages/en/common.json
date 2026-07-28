@@ -1,0 +1,6 @@
+{
+  "appName": "Enterprise Next App",
+  "nav": { "home": "Home", "dashboard": "Dashboard" },
+  "actions": { "save": "Save", "cancel": "Cancel", "submit": "Submit", "loading": "Loading..." },
+  "theme": { "light": "Light", "dark": "Dark", "system": "System" }
+}
