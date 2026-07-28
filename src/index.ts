@@ -1,13 +1,59 @@
 import { devCommand, installCommand } from "@nova/core";
 import * as p from "@clack/prompts";
 import { execa } from "execa";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 
 import { generateProject } from "./generator.js";
 import { collectAnswers } from "./prompts.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function readPackageVersion(): string {
+  try {
+    // dist/index.js -> ../package.json resolves correctly both in the repo
+    // (tsup output at ./dist) and once installed globally from npm.
+    const pkgPath = path.join(__dirname, "..", "package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
+function printHelp() {
+  console.log(`
+${pc.bold("nova-create")} - scaffold a production-ready Next.js app
+
+${pc.bold("Usage")}
+  nova-create [project-name] [options]
+
+${pc.bold("Options")}
+  -h, --help       Show this help message
+  -v, --version    Print the installed version
+
+${pc.bold("Examples")}
+  nova-create my-app
+  nova-create
+`);
+}
+
 export async function run() {
-  const cliProjectName = process.argv[2] && !process.argv[2].startsWith("-") ? process.argv[2] : undefined;
+  const args = process.argv.slice(2);
+
+  if (args.includes("-h") || args.includes("--help")) {
+    printHelp();
+    return;
+  }
+
+  if (args.includes("-v") || args.includes("--version")) {
+    console.log(readPackageVersion());
+    return;
+  }
+
+  const cliProjectName = args[0] && !args[0].startsWith("-") ? args[0] : undefined;
 
   const answers = await collectAnswers(cliProjectName);
 
@@ -32,7 +78,7 @@ export async function run() {
     try {
       await execa("git", ["init"], { cwd: result.targetDir });
       await execa("git", ["add", "-A"], { cwd: result.targetDir });
-      await execa("git", ["commit", "-m", "chore: initial commit from create-enterprise-next"], {
+      await execa("git", ["commit", "-m", "chore: initial commit from nova-create"], {
         cwd: result.targetDir,
       });
       p.log.success("Initialized git repository");

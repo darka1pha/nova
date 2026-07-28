@@ -4,15 +4,35 @@ import pc from "picocolors";
 
 import type { Answers, FeatureKey, UiLibrary } from "./types.js";
 
+// Shared with src/index.ts validation for CLI-argument project names so
+// the interactive prompt and the `nova-create <name>` argument path enforce
+// the exact same rule. Deliberately excludes "." and "/" so a project name
+// can never resolve outside the target directory in generator.ts.
+const PROJECT_NAME_PATTERN = /^[a-z0-9-_]+$/i;
+
+export function isValidProjectName(name: string): boolean {
+  return PROJECT_NAME_PATTERN.test(name);
+}
+
 export async function collectAnswers(cliProjectName?: string): Promise<Answers> {
-  p.intro(pc.bgCyan(pc.black(" create-enterprise-next ")));
+  p.intro(pc.bgCyan(pc.black(" nova ")));
+
+  // A name passed as a CLI argument previously bypassed validation entirely,
+  // allowing invalid names (spaces, path separators, "..") to reach
+  // path.resolve() in generator.ts. Validate it up front instead of trusting it.
+  if (cliProjectName && !isValidProjectName(cliProjectName)) {
+    p.log.error(
+      `Invalid project name "${cliProjectName}". Use only letters, numbers, dashes, or underscores.`,
+    );
+    process.exit(1);
+  }
 
   const projectNameInput = cliProjectName ?? (await p.text({
     message: "What is your project named?",
     placeholder: "my-enterprise-app",
     validate: (value) => {
       if (!value) return "Project name is required";
-      if (!/^[a-z0-9-_]+$/i.test(value)) {
+      if (!isValidProjectName(value)) {
         return "Use letters, numbers, dashes or underscores only";
       }
     },
