@@ -13,8 +13,8 @@
     "declaration": true,
     "sourceMap": true,
     "paths": {
-      "@helix/core": ["./packages/core/src/index.ts"],
-      "@helix/core/*": ["./packages/core/src/*"]
+      "@nova/core": ["./packages/core/src/index.ts"],
+      "@nova/core/*": ["./packages/core/src/*"]
     }
   },
   "include": ["src/**/*.ts"]

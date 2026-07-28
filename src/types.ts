@@ -1,4 +1,4 @@
-import type { PackageManager } from "@helix/core";
+import type { PackageManager } from "@nova/core";
 
 export type FeatureKey =
   | "prisma"

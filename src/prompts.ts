@@ -1,4 +1,4 @@
-import { bail, type PackageManager } from "@helix/core";
+import { bail, type PackageManager } from "@nova/core";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 

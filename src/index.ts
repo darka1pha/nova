@@ -1,4 +1,4 @@
-import { devCommand, installCommand } from "@helix/core";
+import { devCommand, installCommand } from "@nova/core";
 import * as p from "@clack/prompts";
 import { execa } from "execa";
 import pc from "picocolors";

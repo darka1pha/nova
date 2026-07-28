@@ -1,4 +1,4 @@
-import { copyTemplateDir, devCommand, installCommand } from "@helix/core";
+import { copyTemplateDir, devCommand, installCommand } from "@nova/core";
 import fs from "fs-extra";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
