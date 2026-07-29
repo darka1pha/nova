@@ -22,7 +22,7 @@
     "dev": "tsx ./src/index.ts",
     "prepack": "npm run build",
     "prepublishOnly": "npm run typecheck && npm run build",
-    "start": "node ./bin/nova-create.js",
+    "start": "node ./bin/nova.js",
     "typecheck": "npm run typecheck --workspace=@nova/core && tsc --noEmit"
   },
   "keywords": [

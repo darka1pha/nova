@@ -25,18 +25,18 @@ function readPackageVersion(): string {
 
 function printHelp() {
   console.log(`
-${pc.bold("nova-create")} - scaffold a production-ready Next.js app
+${pc.bold("nova")} - scaffold a production-ready Next.js app
 
 ${pc.bold("Usage")}
-  nova-create [project-name] [options]
+  nova [project-name] [options]
 
 ${pc.bold("Options")}
   -h, --help       Show this help message
   -v, --version    Print the installed version
 
 ${pc.bold("Examples")}
-  nova-create my-app
-  nova-create
+  nova my-app
+  nova
 `);
 }
 
@@ -53,7 +53,16 @@ export async function run() {
     return;
   }
 
-  const cliProjectName = args[0] && !args[0].startsWith("-") ? args[0] : undefined;
+  const firstArg = args[0];
+
+  if (firstArg?.startsWith("-")) {
+    console.error(`Unknown option: ${firstArg}\n`);
+    printHelp();
+    process.exitCode = 1;
+    return;
+  }
+
+  const cliProjectName = firstArg;
 
   const answers = await collectAnswers(cliProjectName);
 
@@ -95,6 +104,7 @@ export async function run() {
       installSpinner.stop("Dependencies installed");
     } catch (error) {
       installSpinner.stop("Dependency installation failed", 1);
+      p.log.error(error instanceof Error ? error.message : String(error));
       p.log.warn(
         `Run "${installCommand(answers.packageManager)}" manually inside ${answers.projectName}.`,
       );
