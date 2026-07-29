@@ -1,0 +1,55 @@
+# Animations & Motion Plugin
+
+This addon adds Framer Motion integration with pre-built animation variants.
+
+## Features
+
+- **30+ pre-built animation variants** for common UI patterns
+- **Entrance, exit, and stagger animations**
+- **Modal and dialog animations**
+- **Page transition animations**
+- **Loading and spinner animations**
+- **TypeScript support**
+- **Accessibility-friendly** (respects prefers-reduced-motion)
+
+## Files Added
+
+- `src/lib/animations/variants.ts` — All animation variants
+- `src/lib/animations/index.ts` — Barrel export
+- `docs/animations.md` — Complete animation guide
+
+## Quick Start
+
+1. Import animation variants:
+
+```tsx
+import { motion } from "framer-motion";
+import { fadeInUpVariants } from "@/lib/animations";
+```
+
+2. Use with motion components:
+
+```tsx
+<motion.div
+  variants={fadeInUpVariants}
+  initial="hidden"
+  whileInView="visible"
+>
+  Content
+</motion.div>
+```
+
+3. See `docs/animations.md` for all available variants and examples
+
+## Variants by Category
+
+- **Fade**: fadeIn, fadeInUp, fadeInDown, fadeInLeft, fadeInRight
+- **Slide**: slideInUp, slideInDown, slideInLeft, slideInRight
+- **Scale**: scaleIn
+- **Stagger**: containerVariants, listContainerVariants
+- **Modal**: modalBackdropVariants, modalContentVariants
+- **Spinner**: rotateVariants, pulseVariants
+
+## Dependencies
+
+- `framer-motion` — Added automatically when this addon is selected
