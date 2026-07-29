@@ -1,0 +1,33 @@
+# Design System Plugin
+
+This addon adds a design system foundation to your project with:
+
+- **Design Tokens** (`src/lib/design-system/tokens.ts`): Centralized color, spacing, typography, and shadow definitions
+- **Component Organization**: Structured folder layout for organizing UI, layout, navigation, feedback, data-display, and form components
+- **Tailwind Integration**: Automatic CSS variable integration for design tokens in Tailwind
+- **Documentation**: Complete design system guide in `docs/design-system.md`
+
+## Quick Start
+
+1. Import design tokens in your components:
+
+```tsx
+import { designTokens } from "@/lib/design-system";
+```
+
+2. Organize your components into categories:
+
+- `src/components/ui/` — Primitive building blocks
+- `src/components/layout/` — Page layout components
+- `src/components/navigation/` — Nav, breadcrumbs, menus
+- `src/components/feedback/` — Alerts, spinners, toasts
+- `src/components/data-display/` — Tables, lists, grids
+- `src/components/forms/` — Form inputs and fields
+
+3. See `docs/design-system.md` for detailed usage and best practices.
+
+## Files Added
+
+- `src/lib/design-system/tokens.ts` — Design token definitions
+- `src/lib/design-system/index.ts` — Barrel export
+- `docs/design-system.md` — Complete design system documentation
