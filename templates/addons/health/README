@@ -1,0 +1,3 @@
+Health addon (template overlay)
+
+Adds /api/ready endpoint and docs. Use feature flag 'health' to include.
