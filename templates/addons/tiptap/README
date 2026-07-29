@@ -1,0 +1,51 @@
+# Tiptap Rich Text Editor Plugin
+
+Professional content editing with full formatting, Markdown/HTML support, and extensibility.
+
+## Files Added
+
+- `src/components/ui/editor/rich-text-editor.tsx` — Main editor component
+- `src/components/ui/editor/index.ts` — Barrel export
+- `docs/tiptap.md` — Complete guide and examples
+
+## Quick Start
+
+```tsx
+import { RichTextEditor } from "@/components/ui/editor";
+
+export function MyEditor() {
+  return (
+    <RichTextEditor
+      placeholder="Write something..."
+      onChange={(html) => console.log(html)}
+    />
+  );
+}
+```
+
+## Features
+
+✓ Bold, italic, code, lists, headings  
+✓ Links and images  
+✓ Markdown ↔ HTML conversion  
+✓ Read-only display mode  
+✓ Undo/Redo  
+✓ Full TypeScript support  
+✓ Accessibility-first  
+
+## Components
+
+- **RichTextEditor** — Full editing interface with toolbar
+- **RichTextDisplay** — Read-only content display
+- **htmlToMarkdown()** — Convert HTML to Markdown
+- **markdownToHtml()** — Convert Markdown to HTML
+
+## Dependencies
+
+- `@tiptap/react` — React integration
+- `@tiptap/starter-kit` — Core extensions
+- `@tiptap/extension-placeholder` — Placeholder
+- `@tiptap/extension-link` — Links
+- `@tiptap/extension-image` — Images
+
+See `docs/tiptap.md` for complete documentation.
