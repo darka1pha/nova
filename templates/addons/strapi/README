@@ -1,0 +1,40 @@
+# Strapi CMS Plugin
+
+This addon adds Strapi headless CMS integration to your Next.js application.
+
+## Features
+
+- **Type-safe API client** (`src/lib/cms/strapi/client.ts`)
+- **Common content types** (`src/lib/cms/strapi/types.ts`) ready to customize
+- **Query utilities**: Query, filter, sort Strapi content
+- **Media URL handling**: Optimize image delivery
+- **Authentication**: Support for API tokens and authenticated requests
+- **Complete documentation** in `docs/strapi.md`
+
+## Files Added
+
+- `src/lib/cms/strapi/client.ts` — API client and utilities
+- `src/lib/cms/strapi/types.ts` — Example content types
+- `src/lib/cms/strapi/index.ts` — Barrel export
+- `docs/strapi.md` — Complete integration guide
+
+## Quick Setup
+
+1. Set environment variables:
+   ```bash
+   NEXT_PUBLIC_STRAPI_URL=http://localhost:1337
+   STRAPI_API_TOKEN=your_token
+   ```
+
+2. Import and use the client:
+   ```tsx
+   import { queryContent } from "@/lib/cms/strapi";
+   
+   const posts = await queryContent("blog-posts", {
+     sort: "createdAt:desc",
+   });
+   ```
+
+3. Update content types in `src/lib/cms/strapi/types.ts` to match your schema
+
+See `docs/strapi.md` for complete documentation.
