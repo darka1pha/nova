@@ -41,6 +41,9 @@ const ADDON_FOLDERS: Record<FeatureKey, string> = {
   designSystem: "design-system",
   strapi: "strapi",
   animations: "animations",
+  tanstackTable: "tanstack-table",
+  recharts: "recharts",
+  tiptap: "tiptap",
 };
 
 export async function generateProject(answers: Answers, { onStep }: GenerateProjectOptions = {}) {
@@ -471,6 +474,9 @@ async function patchReadme(targetDir: string, answers: Answers) {
     designSystem: "Design system & tokens",
     strapi: "Strapi CMS integration",
     animations: "Framer Motion animations",
+    tanstackTable: "TanStack Table (data tables)",
+    recharts: "Recharts (charts & visualizations)",
+    tiptap: "Tiptap rich text editor",
   };
 
   const scriptHints: Partial<Record<FeatureKey, string>> = {
