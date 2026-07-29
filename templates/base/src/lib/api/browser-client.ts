@@ -1,11 +1,5 @@
-"use client";
+﻿"use client";
 
-/**
- * Client Component-safe counterpart to `lib/api/client.ts`.
- * The server client reads the access token from an httpOnly cookie via
- * `server-only` code; in the browser we instead keep the token in memory
- * (set by the auth feature after login) and never touch cookies directly.
- */
 import { ApiError, type ApiRequestConfig, type HttpMethod } from "@/lib/api/types";
 import { getClientAccessToken, setClientAccessToken } from "@/lib/auth/client-token-store";
 

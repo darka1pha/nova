@@ -33,10 +33,6 @@ async function request<T>(
   path: string,
   config: ApiRequestConfig = {},
 ): Promise<T> {
-  // Interceptors may rewrite the path and/or config before the request is
-  // built. Both the resolved path and resolved config must be used below —
-  // previously this discarded any interceptor changes and leaked an
-  // internal "__resolvedUrl" marker into the fetch() options via spread.
   const { url: resolvedPath, config: resolvedConfig } = await runRequestInterceptors(
     path,
     config,
