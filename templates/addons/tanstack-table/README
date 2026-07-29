@@ -1,0 +1,35 @@
+# TanStack Table Plugin
+
+Advanced data tables with sorting, filtering, pagination, and column visibility control.
+
+## Files Added
+
+- `src/components/ui/data-table/index.tsx` — Production-ready DataTable component
+- `docs/tanstack-table.md` — Complete guide and examples
+
+## Quick Start
+
+```tsx
+import { DataTable } from "@/components/ui/data-table";
+
+const columns = [
+  { accessorKey: "name", header: "Name" },
+  { accessorKey: "email", header: "Email" },
+];
+
+export function MyTable() {
+  return <DataTable columns={columns} data={users} globalFilterColumn="name" />;
+}
+```
+
+## Features
+
+✓ Sorting (click headers)  
+✓ Global filtering  
+✓ Pagination  
+✓ Row selection  
+✓ Column visibility  
+✓ Full TypeScript support  
+✓ Accessible (WCAG)
+
+See `docs/tanstack-table.md` for advanced examples.
