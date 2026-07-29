@@ -5,7 +5,7 @@ import pc from "picocolors";
 import type { Answers, FeatureKey, UiLibrary } from "./types.js";
 
 // Shared with src/index.ts validation for CLI-argument project names so
-// the interactive prompt and the `nova-create <name>` argument path enforce
+// the interactive prompt and the `nova <name>` argument path enforce
 // the exact same rule. Deliberately excludes "." and "/" so a project name
 // can never resolve outside the target directory in generator.ts.
 const PROJECT_NAME_PATTERN = /^[a-z0-9-_]+$/i;

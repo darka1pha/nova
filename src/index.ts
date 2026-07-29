@@ -87,7 +87,7 @@ export async function run() {
     try {
       await execa("git", ["init"], { cwd: result.targetDir });
       await execa("git", ["add", "-A"], { cwd: result.targetDir });
-      await execa("git", ["commit", "-m", "chore: initial commit from nova-create"], {
+      await execa("git", ["commit", "-m", "chore: initial commit from nova"], {
         cwd: result.targetDir,
       });
       p.log.success("Initialized git repository");
