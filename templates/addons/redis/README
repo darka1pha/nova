@@ -1,0 +1,4 @@
+Redis addon (template overlay)
+
+Adds src/lib/redis client wrapper and docs. Use feature flag 'redis' when
+scaffolding to include this addon.
