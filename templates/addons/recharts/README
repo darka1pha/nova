@@ -1,0 +1,33 @@
+# Recharts Plugin
+
+Beautiful, responsive charts and visualizations with Recharts.
+
+## Files Added
+
+- `src/components/ui/charts/examples.tsx` — Pre-built chart components (line, bar, pie)
+- `docs/recharts.md` — Complete documentation
+
+## Included Charts
+
+- **Line Chart** — Trends and time-series data
+- **Bar Chart** — Category comparisons
+- **Pie Chart** — Proportions and distributions
+
+## Quick Example
+
+```tsx
+import { LineChartExample } from "@/components/ui/charts/examples";
+
+<LineChartExample />
+```
+
+## Features
+
+✓ Fully responsive  
+✓ Dark mode support  
+✓ Tooltips and legends  
+✓ TypeScript support  
+✓ Copy-paste examples  
+✓ Accessible charts
+
+See `docs/recharts.md` for complete guide.
