@@ -8,6 +8,7 @@ export type FeatureKey =
   | "vitest"
   | "storybook"
   | "docker"
+  | "dockerCompose"
   | "husky"
   | "pwa"
   | "bundleAnalyzer"
@@ -16,11 +17,29 @@ export type FeatureKey =
   | "reactEmail"
   | "playwright"
   | "sentry"
-  | "openapi";
+  | "openapi"
+  | "redis"
+  | "mailpit"
+  | "health"
+  | "securityHeaders"
+  | "designSystem"
+  | "strapi"
+  | "animations"
+  | "tanstackTable"
+  | "recharts"
+  | "tiptap";
 
 export type FeatureFlags = Record<FeatureKey, boolean>;
 
-export type UiLibrary = "shadcn" | "mui" | "chakra";
+export type UiLibrary =
+  | "shadcn"
+  | "mui"
+  | "chakra"
+  | "ant"
+  | "mantine"
+  | "hero"
+  | "daisy"
+  | "headless";
 
 export interface Answers {
   projectName: string;

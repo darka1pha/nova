@@ -21,6 +21,7 @@ const ADDON_FOLDERS: Record<FeatureKey, string> = {
   betterAuth: "better-auth",
   cypress: "cypress",
   docker: "docker",
+  dockerCompose: "docker-compose",
   husky: "husky",
   storybook: "storybook",
   vitest: "vitest",
@@ -33,6 +34,13 @@ const ADDON_FOLDERS: Record<FeatureKey, string> = {
   playwright: "playwright",
   sentry: "sentry",
   openapi: "openapi",
+  redis: "redis",
+  mailpit: "mailpit",
+  health: "health",
+  securityHeaders: "security-headers",
+  designSystem: "design-system",
+  strapi: "strapi",
+  animations: "animations",
 };
 
 export async function generateProject(answers: Answers, { onStep }: GenerateProjectOptions = {}) {
@@ -72,10 +80,251 @@ export async function generateProject(answers: Answers, { onStep }: GenerateProj
   onStep?.("Patching configuration");
   await patchNextConfig(targetDir, answers.features);
   await patchAppProviders(targetDir, answers.features, uiLibrary);
+
+  if (answers.features.storybook) {
+    onStep?.("Patching Storybook preview");
+    await writeStorybookPreview(targetDir, uiLibrary, answers.features);
+  }
+
+  // Auto-patch Tailwind to enable DaisyUI when the Daisy UI library is selected
+  if (uiLibrary === "daisy") {
+    onStep?.("Patching Tailwind config for DaisyUI");
+    await writeTailwindForDaisy(targetDir);
+  }
+
   await patchReadme(targetDir, answers);
   await patchLintStaged(targetDir, answers.features);
 
+  // Docker Compose generation (runtime-driven) — write docker-compose.yml
+  if (answers.features.dockerCompose) {
+    onStep?.("Generating docker-compose.yml");
+    await generateDockerCompose(targetDir, answers.features);
+  }
+
+  // Patch middleware to add security headers if the feature is enabled
+  if (answers.features.securityHeaders) {
+    onStep?.("Patching middleware for security headers");
+    await patchMiddlewareForSecurityHeaders(targetDir);
+  }
+
   return { targetDir };
+}
+
+async function writeStorybookPreview(targetDir: string, uiLibrary: UiLibrary, features: FeatureFlags) {
+  const sbDir = path.join(targetDir, ".storybook");
+  await fs.ensureDir(sbDir);
+  const previewPath = path.join(sbDir, "preview.ts");
+
+  // Default preview content — imports global styles and sets basic parameters
+  let content = `import type { Preview } from "@storybook/react";
+
+import "../src/styles/globals.css";
+
+const preview: Preview = {
+  parameters: {
+    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
+  },
+};
+
+export default preview;
+`;
+
+  // Provider-aware decorators per UI library override
+  if (uiLibrary === "ant") {
+    content = `import type { Preview } from "@storybook/react";
+import "../src/styles/globals.css";
+import React from "react";
+import { AntProvider } from "../src/providers/ant-provider";
+
+export const decorators = [
+  (Story) => (
+    <AntProvider>
+      <Story />
+    </AntProvider>
+  ),
+];
+
+const preview: Preview = {
+  parameters: {
+    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
+  },
+};
+
+export default preview;
+`;
+  } else if (uiLibrary === "mantine") {
+    content = `import type { Preview } from "@storybook/react";
+import "../src/styles/globals.css";
+import React from "react";
+import { MantineProvider } from "../src/providers/mantine-provider";
+
+export const decorators = [
+  (Story) => (
+    <MantineProvider>
+      <Story />
+    </MantineProvider>
+  ),
+];
+
+const preview: Preview = {
+  parameters: {
+    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
+  },
+};
+
+export default preview;
+`;
+  } else if (uiLibrary === "hero") {
+    content = `import type { Preview } from "@storybook/react";
+import "../src/styles/globals.css";
+import React from "react";
+import { HeroProvider } from "../src/providers/nextui-provider";
+
+export const decorators = [
+  (Story) => (
+    <HeroProvider>
+      <Story />
+    </HeroProvider>
+  ),
+];
+
+const preview: Preview = {
+  parameters: {
+    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
+  },
+};
+
+export default preview;
+`;
+  } else if (uiLibrary === "chakra") {
+    content = `import type { Preview } from "@storybook/react";
+import "../src/styles/globals.css";
+import React from "react";
+import { ChakraAppProvider } from "../src/providers/chakra-provider";
+
+export const decorators = [
+  (Story) => (
+    <ChakraAppProvider>
+      <Story />
+    </ChakraAppProvider>
+  ),
+];
+
+const preview: Preview = {
+  parameters: {
+    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
+  },
+};
+
+export default preview;
+`;
+  } else if (uiLibrary === "mui") {
+    content = `import type { Preview } from "@storybook/react";
+import "../src/styles/globals.css";
+import React from "react";
+import { MuiProvider } from "../src/providers/mui-provider";
+
+export const decorators = [
+  (Story) => (
+    <MuiProvider>
+      <Story />
+    </MuiProvider>
+  ),
+];
+
+const preview: Preview = {
+  parameters: {
+    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
+  },
+};
+
+export default preview;
+`;
+  }
+
+  // If MSW is enabled in features, initialize and include the MSW decorator
+  if (features.msw) {
+    content = `import { initialize, mswDecorator } from "msw-storybook-addon";\n${content}\ninitialize();\n\nexport const decorators = [mswDecorator].concat((typeof decorators !== 'undefined') ? decorators : []);`;
+  }
+
+  await fs.writeFile(previewPath, content, "utf8");
+}
+
+
+async function generateDockerCompose(targetDir: string, features: FeatureFlags) {
+  const services: string[] = [];
+
+  // app service (uses local Dockerfile if present)
+  services.push(`  app:\n    build: .\n    ports:\n      - \"3000:3000\"\n    environment:\n      - NODE_ENV=development\n    depends_on:\n      - mailpit\n`);
+
+  if (features.prisma) {
+    services.push(`  postgres:\n    image: postgres:15\n    environment:\n      - POSTGRES_PASSWORD=postgres\n    ports:\n      - \"5432:5432\"\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n`);
+  }
+
+  if (features.redis) {
+    services.push(`  redis:\n    image: redis:7.2-alpine\n    ports:\n      - \"6379:6379\"\n`);
+  }
+
+  if (features.mailpit) {
+    services.push(`  mailpit:\n    image: axllent/mailpit:latest\n    ports:\n      - \"8025:8025\"\n      - \"1025:1025\"\n`);
+  }
+
+  const volumes = features.prisma ? `\nvolumes:\n  pgdata:` : "";
+
+  const compose = `version: '3.8'\nservices:\n${services.join("\n")}${volumes}\n`;
+
+  await fs.writeFile(path.join(targetDir, "docker-compose.yml"), compose, "utf8");
+}
+
+async function patchMiddlewareForSecurityHeaders(targetDir: string) {
+  const middlewarePath = path.join(targetDir, "src", "middleware.ts");
+  if (!(await fs.pathExists(middlewarePath))) return;
+  let content = await fs.readFile(middlewarePath, "utf8");
+
+  // Idempotent: add import and wrapper only if not present
+  if (!content.includes("@/lib/security-headers")) {
+    content = content.replace(
+      "import createMiddleware from \"next-intl/middleware\";",
+      "import createMiddleware from \"next-intl/middleware\";\nimport { applySecurityHeaders } from \"@/lib/security-headers\";",
+    );
+
+    // Wrap the default export function
+    content = content.replace(
+      "export default createMiddleware(routing);",
+      `const __nova_next_middleware = createMiddleware(routing);
+
+export default async function middleware(request) {
+  const response = await __nova_next_middleware(request);
+  try { applySecurityHeaders(response); } catch (e) { /* noop */ }
+  return response;
+}`,
+    );
+
+    await fs.writeFile(middlewarePath, content, "utf8");
+  }
+}
+
+async function writeTailwindForDaisy(targetDir: string) {
+  const tailwindPath = path.join(targetDir, "tailwind.config.ts");
+  if (!(await fs.pathExists(tailwindPath))) return;
+  let content = await fs.readFile(tailwindPath, "utf8");
+
+  // Add daisyui import if missing
+  if (!content.includes("from 'daisyui'") && !content.includes("from \"daisyui\"")) {
+    content = content.replace(/(import type \{ Config \} from \"tailwindcss\";\n\n)/, `$1import daisyui from 'daisyui';\n\n`);
+  }
+
+  // Add daisyui plugin into plugins array
+  if (!content.includes("daisyui")) {
+    content = content.replace(/plugins: \[\],/, "plugins: [daisyui],");
+  }
+
+  // Add basic daisyui config if not present
+  if (!content.includes("daisyui:")) {
+    content = content.replace(/export default config;/, `config.daisyui = { themes: ['light', 'dark'] };\n\nexport default config;`);
+  }
+
+  await fs.writeFile(tailwindPath, content, "utf8");
 }
 
 async function patchNextConfig(targetDir: string, features: FeatureFlags) {
@@ -205,6 +454,7 @@ async function patchReadme(targetDir: string, answers: Answers) {
     vitest: "Vitest (unit tests)",
     storybook: "Storybook",
     docker: "Docker (multi-stage build)",
+    dockerCompose: "Docker Compose (dev services)",
     husky: "Husky + lint-staged",
     pwa: "PWA support",
     bundleAnalyzer: "Bundle Analyzer",
@@ -214,6 +464,13 @@ async function patchReadme(targetDir: string, answers: Answers) {
     playwright: "Playwright E2E tests",
     sentry: "Sentry monitoring",
     openapi: "OpenAPI typed client generation",
+    redis: "Redis client",
+    mailpit: "Mailpit (local email)",
+    health: "Health & readiness endpoints",
+    securityHeaders: "Security headers middleware",
+    designSystem: "Design system & tokens",
+    strapi: "Strapi CMS integration",
+    animations: "Framer Motion animations",
   };
 
   const scriptHints: Partial<Record<FeatureKey, string>> = {
@@ -255,6 +512,16 @@ function uiLibraryLabel(uiLibrary: UiLibrary) {
       return "Material UI";
     case "chakra":
       return "Chakra UI";
+    case "ant":
+      return "Ant Design";
+    case "mantine":
+      return "Mantine";
+    case "hero":
+      return "NextUI / HeroUI";
+    case "daisy":
+      return "DaisyUI (Tailwind)";
+    case "headless":
+      return "Headless UI";
     case "shadcn":
     default:
       return "shadcn-style primitives";

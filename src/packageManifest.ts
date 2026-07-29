@@ -68,6 +68,28 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
     dependencies["@emotion/react"] = "^11.14.0";
   }
 
+  if (uiLibrary === "ant") {
+    dependencies["antd"] = "^5.10.0";
+  }
+
+  if (uiLibrary === "mantine") {
+    dependencies["@mantine/core"] = "^6.0.0";
+    dependencies["@mantine/hooks"] = "^6.0.0";
+  }
+
+  if (uiLibrary === "hero") {
+    dependencies["@nextui-org/react"] = "^1.0.0";
+  }
+
+  if (uiLibrary === "daisy") {
+    devDependencies["daisyui"] = "^3.1.0";
+  }
+
+  if (uiLibrary === "headless") {
+    dependencies["@headlessui/react"] = "^1.8.0";
+    dependencies["@heroicons/react"] = "^2.0.18";
+  }
+
   if (features.prisma) {
     dependencies["@prisma/client"] = "^6.1.0";
     devDependencies["prisma"] = "^6.1.0";
@@ -118,6 +140,8 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
     devDependencies["@storybook/nextjs"] = "^8.4.7";
     devDependencies["@storybook/react"] = "^8.4.7";
     devDependencies["@storybook/addon-essentials"] = "^8.4.7";
+    devDependencies["@storybook/addon-a11y"] = "^8.4.7";
+    devDependencies["msw-storybook-addon"] = "^2.0.0";
     scripts["storybook"] = "storybook dev -p 6006";
     scripts["build-storybook"] = "storybook build";
   }
@@ -141,6 +165,28 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
     dependencies["zustand"] = "^5.0.2";
   }
 
+  // Phase 1 plugins
+  if (features.redis) {
+    // ioredis is robust and commonly used for both simple and advanced use
+    // cases (reconnections, clusters). Expose it when redis feature is
+    // selected so generated projects can import src/lib/redis client.
+    dependencies["ioredis"] = "^5.3.2";
+  }
+
+  if (features.mailpit) {
+    // nodemailer for SMTP sending in development (Mailpit acts as SMTP sink)
+    dependencies["nodemailer"] = "^6.9.3";
+  }
+
+  if (features.securityHeaders) {
+    // no external deps required; provide a small helper in the template
+  }
+
+  if (features.health) {
+    // health checks may depend on redis/prisma being present; no extra
+    // dependencies required at scaffold-time.
+  }
+
   if (features.msw) {
     devDependencies["msw"] = "^2.7.0";
     scripts["mock:api"] = "msw init public --save";
@@ -161,6 +207,10 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
     dependencies["openapi-fetch"] = "^0.17.0";
     devDependencies["openapi-typescript"] = "^7.13.0";
     scripts["api:types"] = "openapi-typescript ./openapi/schema.yaml -o ./src/lib/api/schema.d.ts";
+  }
+
+  if (features.animations) {
+    dependencies["framer-motion"] = "^11.3.0";
   }
 
   return {

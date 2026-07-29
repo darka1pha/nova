@@ -153,4 +153,199 @@ const chakraProviders = await fs.readFile(path.join(chakraResult.targetDir, "src
 console.log("--- chakra app-providers.tsx ---");
 console.log(chakraProviders);
 
+// ANT UI test
+const antAnswers = {
+  ...fullAnswers,
+  projectName: "smoke-ant",
+  uiLibrary: "ant",
+  features: {
+    prisma: false,
+    betterAuth: false,
+    tanstackQuery: false,
+    cypress: false,
+    vitest: false,
+    storybook: false,
+    docker: false,
+    husky: false,
+    pwa: false,
+    bundleAnalyzer: false,
+    zustand: false,
+    msw: false,
+    reactEmail: false,
+    playwright: false,
+    sentry: false,
+    openapi: false,
+    redis: false,
+    mailpit: false,
+    dockerCompose: false,
+    health: false,
+    securityHeaders: false,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, antAnswers.projectName));
+const antResult = await generateProject(antAnswers, { onStep: (s) => console.log("ant step:", s) });
+const antMustExist = [
+  "src/providers/ant-provider.tsx",
+  "docs/ui-library.md",
+];
+
+missing = [];
+for (const rel of antMustExist) {
+  const exists = await fs.pathExists(path.join(antResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING ANT FILES:", missing);
+  process.exit(1);
+}
+
+// Mantine UI test
+const mantineAnswers = {
+  ...fullAnswers,
+  projectName: "smoke-mantine",
+  uiLibrary: "mantine",
+  features: {
+    prisma: false,
+    betterAuth: false,
+    tanstackQuery: false,
+    cypress: false,
+    vitest: false,
+    storybook: false,
+    docker: false,
+    husky: false,
+    pwa: false,
+    bundleAnalyzer: false,
+    zustand: false,
+    msw: false,
+    reactEmail: false,
+    playwright: false,
+    sentry: false,
+    openapi: false,
+    redis: false,
+    mailpit: false,
+    dockerCompose: false,
+    health: false,
+    securityHeaders: false,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, mantineAnswers.projectName));
+const mantineResult = await generateProject(mantineAnswers, { onStep: (s) => console.log("mantine step:", s) });
+const mantineMustExist = [
+  "src/providers/mantine-provider.tsx",
+  "docs/ui-library.md",
+];
+
+missing = [];
+for (const rel of mantineMustExist) {
+  const exists = await fs.pathExists(path.join(mantineResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING MANTINE FILES:", missing);
+  process.exit(1);
+}
+
+// NextUI / Hero UI test
+const nextuiAnswers = {
+  ...fullAnswers,
+  projectName: "smoke-nextui",
+  uiLibrary: "hero",
+  features: {
+    prisma: false,
+    betterAuth: false,
+    tanstackQuery: false,
+    cypress: false,
+    vitest: false,
+    storybook: false,
+    docker: false,
+    husky: false,
+    pwa: false,
+    bundleAnalyzer: false,
+    zustand: false,
+    msw: false,
+    reactEmail: false,
+    playwright: false,
+    sentry: false,
+    openapi: false,
+    redis: false,
+    mailpit: false,
+    dockerCompose: false,
+    health: false,
+    securityHeaders: false,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, nextuiAnswers.projectName));
+const nextuiResult = await generateProject(nextuiAnswers, { onStep: (s) => console.log("nextui step:", s) });
+const nextuiMustExist = [
+  "src/providers/nextui-provider.tsx",
+  "docs/ui-library.md",
+];
+
+missing = [];
+for (const rel of nextuiMustExist) {
+  const exists = await fs.pathExists(path.join(nextuiResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING NEXTUI FILES:", missing);
+  process.exit(1);
+}
+
+// Infra plugins test (redis, mailpit, health, security headers, docker-compose)
+const infraAnswers = {
+  ...fullAnswers,
+  projectName: "smoke-infra",
+  uiLibrary: "shadcn",
+  features: {
+    prisma: false,
+    betterAuth: false,
+    tanstackQuery: false,
+    cypress: false,
+    vitest: false,
+    storybook: false,
+    docker: false,
+    husky: false,
+    pwa: false,
+    bundleAnalyzer: false,
+    zustand: false,
+    msw: false,
+    reactEmail: false,
+    playwright: false,
+    sentry: false,
+    openapi: false,
+    redis: true,
+    mailpit: true,
+    dockerCompose: true,
+    health: true,
+    securityHeaders: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, infraAnswers.projectName));
+const infraResult = await generateProject(infraAnswers, { onStep: (s) => console.log("infra step:", s) });
+const infraMustExist = [
+  "src/lib/redis/client.ts",
+  "src/lib/email/mailpit.ts",
+  "src/app/api/ready/route.ts",
+  "src/lib/security-headers.ts",
+  "docker-compose.yml",
+];
+
+missing = [];
+for (const rel of infraMustExist) {
+  const exists = await fs.pathExists(path.join(infraResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING INFRA FILES:", missing);
+  process.exit(1);
+}
+
 console.log("SMOKE TEST OK");
