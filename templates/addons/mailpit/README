@@ -1,0 +1,3 @@
+Mailpit addon (template overlay)
+
+Adds src/lib/email/mailpit.ts and local dev docs. Use feature flag 'mailpit' to include.
