@@ -57,10 +57,13 @@
   "author": "",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_USERNAME/nova"
+    "url": "https://github.com/darka1pha/nova"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/nova#readme",
+  "homepage": "https://github.com/darka1pha/nova#readme",
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/nova/issues"
+    "url": "https://github.com/darka1pha/nova/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
