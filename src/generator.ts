@@ -3,48 +3,18 @@ import fs from "fs-extra";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+
 import { buildPackageJson } from "./packageManifest.js";
 import type { Answers, FeatureFlags, FeatureKey, GenerateProjectOptions, UiLibrary } from "./types.js";
+import { ADDON_FOLDERS } from "./addonRegistry.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_ROOT = path.join(__dirname, "..", "templates");
 const BASE_DIR = path.join(TEMPLATES_ROOT, "base");
-const ADDONS_DIR = path.join(TEMPLATES_ROOT, "addons");
+// Exported so src/add.ts can reuse the exact same addon templates when
+// adding a feature to an already-existing project.
+export const ADDONS_DIR = path.join(TEMPLATES_ROOT, "addons");
 const UI_DIR = path.join(TEMPLATES_ROOT, "ui");
-
-// Maps feature flags -> addon overlay folder name (skipped when false).
-// NOTE: this is the informal "plugin registry" that Phase 4 (plugin loader)
-// replaces with a real registry populated by plugins registering themselves,
-// so new features stop requiring an edit here.
-const ADDON_FOLDERS: Record<FeatureKey, string> = {
-  prisma: "prisma",
-  betterAuth: "better-auth",
-  cypress: "cypress",
-  docker: "docker",
-  dockerCompose: "docker-compose",
-  husky: "husky",
-  storybook: "storybook",
-  vitest: "vitest",
-  tanstackQuery: "tanstack-query",
-  pwa: "pwa",
-  bundleAnalyzer: "bundle-analyzer",
-  zustand: "zustand",
-  msw: "msw",
-  reactEmail: "react-email",
-  playwright: "playwright",
-  sentry: "sentry",
-  openapi: "openapi",
-  redis: "redis",
-  mailpit: "mailpit",
-  health: "health",
-  securityHeaders: "security-headers",
-  designSystem: "design-system",
-  strapi: "strapi",
-  animations: "animations",
-  tanstackTable: "tanstack-table",
-  recharts: "recharts",
-  tiptap: "tiptap",
-};
 
 export async function generateProject(answers: Answers, { onStep }: GenerateProjectOptions = {}) {
   const uiLibrary = answers.uiLibrary ?? "shadcn";

@@ -14,6 +14,53 @@ export function isValidProjectName(name: string): boolean {
   return PROJECT_NAME_PATTERN.test(name);
 }
 
+/**
+ * Distributes over FeatureKey so the resulting type is a union of exact
+ * shapes - `{ value: "prisma"; ... } | { value: "betterAuth"; ... } | ...`
+ * - matching what clack's `multiselect<Value>` expects for its `options`
+ * array. Do NOT replace this with `Array<{ value: FeatureKey; ... }>`
+ * (widens `value` to the whole union on every element, so no element
+ * matches its narrowed variant) or with an `as const` array (produces a
+ * `readonly` tuple, which clack's option type rejects because it wants a
+ * mutable `{ value: unknown; ... }[]`).
+ */
+type FeatureOption<K extends FeatureKey = FeatureKey> = K extends FeatureKey
+  ? { value: K; label: string; hint?: string }
+  : never;
+
+// Exported so both the initial "nova <name>" generation flow and the
+// incremental "nova add" command (src/index.ts) present the exact same
+// feature list/hints instead of maintaining two copies.
+export const FEATURE_OPTIONS: FeatureOption[] = [
+  { value: "prisma", label: "Prisma ORM", hint: "PostgreSQL-ready schema + client singleton" },
+  { value: "betterAuth", label: "Better Auth", hint: "Full session/auth system" },
+  { value: "tanstackQuery", label: "TanStack Query", hint: "Client-side data fetching/caching" },
+  { value: "cypress", label: "Cypress", hint: "E2E testing" },
+  { value: "vitest", label: "Vitest", hint: "Unit/component testing" },
+  { value: "storybook", label: "Storybook", hint: "Component workshop" },
+  { value: "docker", label: "Docker", hint: "Multi-stage production Dockerfile" },
+  { value: "husky", label: "Husky + lint-staged", hint: "Git hooks" },
+  { value: "pwa", label: "PWA support", hint: "Manifest + service worker" },
+  { value: "bundleAnalyzer", label: "Bundle Analyzer", hint: "@next/bundle-analyzer" },
+  { value: "zustand", label: "Zustand", hint: "Small typed client-state store" },
+  { value: "msw", label: "MSW", hint: "Mock API/fetch handlers for dev and tests" },
+  { value: "reactEmail", label: "React Email", hint: "Transactional email templates" },
+  { value: "mailpit", label: "Mailpit (local email dev)", hint: "Local SMTP inbox for development" },
+  { value: "playwright", label: "Playwright", hint: "Modern cross-browser E2E tests" },
+  { value: "sentry", label: "Sentry", hint: "Error monitoring and tracing hooks" },
+  { value: "openapi", label: "OpenAPI typed client", hint: "Generate types from backend contracts" },
+  { value: "redis", label: "Redis", hint: "Redis client and optional caching utilities" },
+  { value: "dockerCompose", label: "Docker Compose (dev)", hint: "Local services (Postgres, Redis, Mailpit)" },
+  { value: "health", label: "Health & readiness endpoints", hint: "Liveness/readiness checks" },
+  { value: "securityHeaders", label: "Security headers", hint: "CSP and common security headers" },
+  { value: "designSystem", label: "Design System", hint: "Centralized design tokens and component organization" },
+  { value: "strapi", label: "Strapi CMS", hint: "Headless CMS integration and content API client" },
+  { value: "animations", label: "Animations (Framer Motion)", hint: "Pre-built animation variants and utilities" },
+  { value: "tanstackTable", label: "TanStack Table", hint: "Advanced data tables with sorting, filtering, pagination" },
+  { value: "recharts", label: "Recharts", hint: "Beautiful responsive charts and visualizations" },
+  { value: "tiptap", label: "Tiptap Rich Text Editor", hint: "Professional content editor with Markdown/HTML support" },
+];
+
 export async function collectAnswers(cliProjectName?: string): Promise<Answers> {
   p.intro(pc.bgCyan(pc.black(" nova ")));
 
@@ -72,35 +119,7 @@ export async function collectAnswers(cliProjectName?: string): Promise<Answers> 
   const features = await p.multiselect<FeatureKey>({
     message: "Select additional features (space to toggle, enter to confirm)",
     required: false,
-    options: [
-      { value: "prisma", label: "Prisma ORM", hint: "PostgreSQL-ready schema + client singleton" },
-      { value: "betterAuth", label: "Better Auth", hint: "Full session/auth system" },
-      { value: "tanstackQuery", label: "TanStack Query", hint: "Client-side data fetching/caching" },
-      { value: "cypress", label: "Cypress", hint: "E2E testing" },
-      { value: "vitest", label: "Vitest", hint: "Unit/component testing" },
-      { value: "storybook", label: "Storybook", hint: "Component workshop" },
-      { value: "docker", label: "Docker", hint: "Multi-stage production Dockerfile" },
-      { value: "husky", label: "Husky + lint-staged", hint: "Git hooks" },
-      { value: "pwa", label: "PWA support", hint: "Manifest + service worker" },
-      { value: "bundleAnalyzer", label: "Bundle Analyzer", hint: "@next/bundle-analyzer" },
-      { value: "zustand", label: "Zustand", hint: "Small typed client-state store" },
-      { value: "msw", label: "MSW", hint: "Mock API/fetch handlers for dev and tests" },
-      { value: "reactEmail", label: "React Email", hint: "Transactional email templates" },
-      { value: "mailpit", label: "Mailpit (local email dev)", hint: "Local SMTP inbox for development" },
-      { value: "playwright", label: "Playwright", hint: "Modern cross-browser E2E tests" },
-      { value: "sentry", label: "Sentry", hint: "Error monitoring and tracing hooks" },
-      { value: "openapi", label: "OpenAPI typed client", hint: "Generate types from backend contracts" },
-      { value: "redis", label: "Redis", hint: "Redis client and optional caching utilities" },
-      { value: "dockerCompose", label: "Docker Compose (dev)", hint: "Local services (Postgres, Redis, Mailpit)" },
-      { value: "health", label: "Health & readiness endpoints", hint: "Liveness/readiness checks" },
-      { value: "securityHeaders", label: "Security headers", hint: "CSP and common security headers" },
-      { value: "designSystem", label: "Design System", hint: "Centralized design tokens and component organization" },
-      { value: "strapi", label: "Strapi CMS", hint: "Headless CMS integration and content API client" },
-      { value: "animations", label: "Animations (Framer Motion)", hint: "Pre-built animation variants and utilities" },
-      { value: "tanstackTable", label: "TanStack Table", hint: "Advanced data tables with sorting, filtering, pagination" },
-      { value: "recharts", label: "Recharts", hint: "Beautiful responsive charts and visualizations" },
-      { value: "tiptap", label: "Tiptap Rich Text Editor", hint: "Professional content editor with Markdown/HTML support" },
-    ],
+    options: FEATURE_OPTIONS,
   });
   bail(features);
 

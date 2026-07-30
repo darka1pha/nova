@@ -213,6 +213,22 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
     dependencies["framer-motion"] = "^11.3.0";
   }
 
+  if (features.tanstackTable) {
+    dependencies["@tanstack/react-table"] = "^8.20.5";
+  }
+
+  if (features.recharts) {
+    dependencies["recharts"] = "^2.13.3";
+  }
+
+  if (features.tiptap) {
+    dependencies["@tiptap/react"] = "^2.10.4";
+    dependencies["@tiptap/starter-kit"] = "^2.10.4";
+    dependencies["@tiptap/extension-placeholder"] = "^2.10.4";
+    dependencies["@tiptap/extension-link"] = "^2.10.4";
+    dependencies["@tiptap/extension-image"] = "^2.10.4";
+  }
+
   return {
     name: projectName,
     version: "0.1.0",
