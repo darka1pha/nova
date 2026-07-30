@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@darkalpha/nova.svg)](https://www.npmjs.com/package/@darkalpha/nova)
 [![npm downloads](https://img.shields.io/npm/dm/@darkalpha/nova.svg)](https://www.npmjs.com/package/@darkalpha/nova)
 [![node](https://img.shields.io/node/v/@darkalpha/nova.svg)](https://www.npmjs.com/package/@darkalpha/nova)
-[![license](https://img.shields.io/npm/l/@darkalpha/nova.svg)](https://github.com/YOUR_USERNAME/nova/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/@darkalpha/nova.svg)](https://github.com/darka1pha/nova/blob/main/LICENSE)
 
 **Nova** is an extensible Next.js development toolkit and CLI for creating, generating, managing, and maintaining production-ready applications.
 
@@ -1217,8 +1217,8 @@ Prefer small, focused changes.
 ## Links
 
 - [npm package](https://www.npmjs.com/package/@darkalpha/nova)
-- [Report an issue](https://github.com/YOUR_USERNAME/nova/issues)
-- [Source code](https://github.com/YOUR_USERNAME/nova)
+- [Report an issue](https://github.com/darka1pha/nova/issues)
+- [Source code](https://github.com/darka1pha/nova)
 
 ---
 
