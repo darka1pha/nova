@@ -4,7 +4,7 @@
   "description": "Nova is an extensible Next.js development toolkit for creating, generating, managing, and maintaining production-ready applications.",
   "type": "module",
   "bin": {
-    "nova": "./bin/nova.js"
+    "nova": "bin/nova.js"
   },
   "workspaces": [
     "packages/*"
@@ -57,7 +57,7 @@
   "author": "",
   "repository": {
     "type": "git",
-    "url": "https://github.com/darka1pha/nova"
+    "url": "git+https://github.com/darka1pha/nova.git"
   },
   "homepage": "https://github.com/darka1pha/nova#readme",
   "bugs": {
