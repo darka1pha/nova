@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 
 import { addFeaturesToProject } from "./add.js";
-import { generateProject } from "./generator.js";
+import { generateProject } from "./generator/index.js";
+import { getPluginInfo, listAllPluginInfo, summarizeFootprint } from "./generator/pluginInfo.js";
+import { resolveFeatureKey } from "./addonRegistry.js";
 import { collectAnswers, FEATURE_OPTIONS } from "./prompts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -42,6 +44,7 @@ ${pc.bold("nova")} - scaffold a production-ready Next.js app
 ${pc.bold("Usage")}
   nova [project-name] [options]
   nova add <feature...> [options]
+  nova plugins [feature]
 
 ${pc.bold("Options")}
   -h, --help       Show this help message
@@ -56,6 +59,8 @@ ${pc.bold("Examples")}
   nova
   nova add prisma redis
   nova add tanstack-query --path ./my-app
+  nova plugins
+  nova plugins prisma
 `);
 }
 
@@ -214,6 +219,54 @@ async function runAddCommand(args: string[]) {
   p.outro(pc.green("Done!"));
 }
 
+function printPluginSummary(info: ReturnType<typeof getPluginInfo>) {
+  const { key, metadata, packageFootprint } = info;
+
+  console.log(pc.bold(pc.cyan(metadata.name)) + pc.dim(`  (${key})`));
+  console.log(`  ${metadata.description}`);
+
+  if (metadata.requires?.length) {
+    console.log(`  ${pc.dim("requires:")}      ${metadata.requires.join(", ")}`);
+  }
+
+  if (metadata.conflicts?.length) {
+    console.log(`  ${pc.dim("conflicts with:")} ${metadata.conflicts.join(", ")}`);
+  }
+
+  if (metadata.supportedUI?.length) {
+    console.log(`  ${pc.dim("supported UI:")}   ${metadata.supportedUI.join(", ")}`);
+  }
+
+  console.log(`  ${pc.dim("package.json:")}   ${summarizeFootprint(packageFootprint)}`);
+}
+
+function runPluginsCommand(args: string[]) {
+  const target = args[0];
+
+  if (target) {
+    const resolved = resolveFeatureKey(target);
+    if (!resolved) {
+      console.error(`Unknown plugin: "${target}"`);
+      console.log(pc.dim("Run `nova plugins` with no argument to see all available plugins."));
+      process.exitCode = 1;
+      return;
+    }
+
+    printPluginSummary(getPluginInfo(resolved));
+    return;
+  }
+
+  console.log(pc.bold(`Available plugins (${listAllPluginInfo().length})\n`));
+
+  for (const info of listAllPluginInfo()) {
+    printPluginSummary(info);
+    console.log("");
+  }
+
+  console.log(pc.dim("Use `nova plugins <feature>` to see details for a single plugin."));
+  console.log(pc.dim("Use `nova add <feature...>` to add one to an existing project."));
+}
+
 export async function run() {
   const args = process.argv.slice(2);
 
@@ -229,6 +282,11 @@ export async function run() {
 
   if (args[0] === "add") {
     await runAddCommand(args.slice(1));
+    return;
+  }
+
+  if (args[0] === "plugins") {
+    runPluginsCommand(args.slice(1));
     return;
   }
 

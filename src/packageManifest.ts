@@ -1,8 +1,16 @@
-import type { Answers } from "./types.js";
+import { FEATURE_CONTRIBUTIONS } from "./featureContributions.js";
+import type { Answers, FeatureKey } from "./types.js";
 
 /**
  * Builds the generated project's package.json.
  * Kept as pure data so it's easy to bump versions in one place.
+ *
+ * Per-feature dependencies/devDependencies/scripts come from
+ * `FEATURE_CONTRIBUTIONS` (src/featureContributions.ts) - the same map
+ * `nova add` uses via `featurePackageAdditions.ts` - so full generation and
+ * incremental `nova add` can never disagree about what a feature
+ * contributes. Only base (always-present) dependencies and UI-library
+ * dependencies are declared inline here, since those aren't feature flags.
  */
 export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }: Pick<Answers, "projectName" | "features"> & Partial<Pick<Answers, "uiLibrary">>) {
   const scripts: Record<string, string> = {
@@ -90,143 +98,15 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
     dependencies["@heroicons/react"] = "^2.0.18";
   }
 
-  if (features.prisma) {
-    dependencies["@prisma/client"] = "^6.1.0";
-    devDependencies["prisma"] = "^6.1.0";
-    scripts["db:generate"] = "prisma generate";
-    scripts["db:migrate"] = "prisma migrate dev";
-    scripts["db:studio"] = "prisma studio";
-    scripts["db:seed"] = "tsx prisma/seed.ts";
-    devDependencies["tsx"] = "^4.19.2";
-  }
+  for (const [feature, enabled] of Object.entries(features) as [FeatureKey, boolean][]) {
+    if (!enabled) continue;
 
-  if (features.betterAuth) {
-    dependencies["better-auth"] = "^1.1.7";
-  }
+    const contribution = FEATURE_CONTRIBUTIONS[feature];
+    if (!contribution) continue;
 
-  if (features.tanstackQuery) {
-    dependencies["@tanstack/react-query"] = "^5.62.11";
-    devDependencies["@tanstack/react-query-devtools"] = "^5.62.11";
-  }
-
-  if (features.cypress) {
-    devDependencies["cypress"] = "^13.17.0";
-    devDependencies["@testing-library/cypress"] = "^10.0.3";
-    scripts["cy:open"] = "cypress open";
-    scripts["cy:run"] = "cypress run";
-    scripts["e2e"] = "start-server-and-test dev http://localhost:3000 cy:run";
-    devDependencies["start-server-and-test"] = "^2.0.9";
-  }
-
-  if (features.playwright) {
-    devDependencies["@playwright/test"] = "^1.61.1";
-    scripts["pw:test"] = "playwright test";
-    scripts["pw:ui"] = "playwright test --ui";
-    scripts["pw:install"] = "playwright install";
-  }
-
-  if (features.vitest) {
-    devDependencies["vitest"] = "^2.1.8";
-    devDependencies["@vitejs/plugin-react"] = "^4.3.4";
-    devDependencies["@testing-library/react"] = "^16.1.0";
-    devDependencies["@testing-library/jest-dom"] = "^6.6.3";
-    devDependencies["jsdom"] = "^25.0.1";
-    scripts["test"] = "vitest run";
-    scripts["test:watch"] = "vitest";
-  }
-
-  if (features.storybook) {
-    devDependencies["storybook"] = "^8.4.7";
-    devDependencies["@storybook/nextjs"] = "^8.4.7";
-    devDependencies["@storybook/react"] = "^8.4.7";
-    devDependencies["@storybook/addon-essentials"] = "^8.4.7";
-    devDependencies["@storybook/addon-a11y"] = "^8.4.7";
-    devDependencies["msw-storybook-addon"] = "^2.0.0";
-    scripts["storybook"] = "storybook dev -p 6006";
-    scripts["build-storybook"] = "storybook build";
-  }
-
-  if (features.husky) {
-    devDependencies["husky"] = "^9.1.7";
-    devDependencies["lint-staged"] = "^15.2.11";
-    scripts["prepare"] = "husky";
-  }
-
-  if (features.pwa) {
-    dependencies["next-pwa"] = "^5.6.0";
-  }
-
-  if (features.bundleAnalyzer) {
-    devDependencies["@next/bundle-analyzer"] = "^15.1.0";
-    scripts["analyze"] = "ANALYZE=true next build";
-  }
-
-  if (features.zustand) {
-    dependencies["zustand"] = "^5.0.2";
-  }
-
-  // Phase 1 plugins
-  if (features.redis) {
-    // ioredis is robust and commonly used for both simple and advanced use
-    // cases (reconnections, clusters). Expose it when redis feature is
-    // selected so generated projects can import src/lib/redis client.
-    dependencies["ioredis"] = "^5.3.2";
-  }
-
-  if (features.mailpit) {
-    // nodemailer for SMTP sending in development (Mailpit acts as SMTP sink)
-    dependencies["nodemailer"] = "^6.9.3";
-  }
-
-  if (features.securityHeaders) {
-    // no external deps required; provide a small helper in the template
-  }
-
-  if (features.health) {
-    // health checks may depend on redis/prisma being present; no extra
-    // dependencies required at scaffold-time.
-  }
-
-  if (features.msw) {
-    devDependencies["msw"] = "^2.7.0";
-    scripts["mock:api"] = "msw init public --save";
-  }
-
-  if (features.reactEmail) {
-    dependencies["@react-email/components"] = "^0.0.33";
-    dependencies["@react-email/render"] = "^1.0.3";
-    devDependencies["react-email"] = "^3.0.6";
-    scripts["email:dev"] = "email dev --dir src/emails --port 3001";
-  }
-
-  if (features.sentry) {
-    dependencies["@sentry/nextjs"] = "^10.66.0";
-  }
-
-  if (features.openapi) {
-    dependencies["openapi-fetch"] = "^0.17.0";
-    devDependencies["openapi-typescript"] = "^7.13.0";
-    scripts["api:types"] = "openapi-typescript ./openapi/schema.yaml -o ./src/lib/api/schema.d.ts";
-  }
-
-  if (features.animations) {
-    dependencies["framer-motion"] = "^11.3.0";
-  }
-
-  if (features.tanstackTable) {
-    dependencies["@tanstack/react-table"] = "^8.20.5";
-  }
-
-  if (features.recharts) {
-    dependencies["recharts"] = "^2.13.3";
-  }
-
-  if (features.tiptap) {
-    dependencies["@tiptap/react"] = "^2.10.4";
-    dependencies["@tiptap/starter-kit"] = "^2.10.4";
-    dependencies["@tiptap/extension-placeholder"] = "^2.10.4";
-    dependencies["@tiptap/extension-link"] = "^2.10.4";
-    dependencies["@tiptap/extension-image"] = "^2.10.4";
+    Object.assign(dependencies, contribution.dependencies ?? {});
+    Object.assign(devDependencies, contribution.devDependencies ?? {});
+    Object.assign(scripts, contribution.scripts ?? {});
   }
 
   return {
@@ -240,5 +120,5 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
 }
 
 function sortKeys<T extends Record<string, string>>(obj: T) {
-  return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b)));
+  return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))) as T;
 }
