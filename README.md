@@ -32,6 +32,12 @@ cd my-app
 nova add prisma redis
 ```
 
+Not sure what a plugin actually adds before you commit to it? Ask the CLI directly:
+
+```bash
+nova plugins prisma
+```
+
 ---
 
 ## Table of Contents
@@ -43,11 +49,13 @@ nova add prisma redis
 - [Creating a Project](#creating-a-project)
 - [CLI Usage](#cli-usage)
 - [Adding Features to an Existing Project (`nova add`)](#adding-features-to-an-existing-project-nova-add)
+- [Inspecting Plugins (`nova plugins`)](#inspecting-plugins-nova-plugins)
 - [What's Included](#whats-included)
 - [Plugins and Add-ons](#plugins-and-add-ons)
 - [UI Frameworks](#ui-frameworks)
 - [Project Architecture](#project-architecture)
 - [Repository Structure](#repository-structure)
+- [Generator Internals](#generator-internals)
 - [Add-on Architecture](#add-on-architecture)
 - [Example Configurations](#example-configurations)
 - [Documentation Generated With Your Project](#documentation-generated-with-your-project)
@@ -59,6 +67,7 @@ nova add prisma redis
 - [Testing the Generator](#testing-the-generator)
 - [Adding a New Plugin](#adding-a-new-plugin)
 - [Contributing](#contributing)
+- [Changelog](#changelog)
 - [Links](#links)
 - [License](#license)
 
@@ -109,9 +118,9 @@ You can also run Nova with no arguments for a fully interactive setup:
 nova
 ```
 
-Nova will prompt you for the project name, package manager, UI library, and any optional add-ons before generating anything.
+Nova will prompt you for the project name, package manager, UI library, and any optional add-ons before generating anything — and will refuse to generate a plugin combination it knows is invalid (see [Plugins and Add-ons](#plugins-and-add-ons)) before writing a single file.
 
-Later, if you decide you need another feature, run `nova add` from inside the project instead of regenerating it — see [Adding Features to an Existing Project](#adding-features-to-an-existing-project-nova-add).
+Later, if you decide you need another feature, run `nova add` from inside the project instead of regenerating it — see [Adding Features to an Existing Project](#adding-features-to-an-existing-project-nova-add). If you're not sure what a plugin does first, run `nova plugins <name>` — see [Inspecting Plugins](#inspecting-plugins-nova-plugins).
 
 ---
 
@@ -223,6 +232,16 @@ Major modules also ship their own local `README.md` (for example `src/lib/api/`,
 
 Everything Nova generates is plain, ordinary Next.js/React/TypeScript code that you own outright the moment it's written to disk. There's no runtime dependency on the `nova` package inside your generated app, no telemetry, and no CLI daemon watching your project. If you want to rip out a feature, delete the files and the corresponding dependency — that's it.
 
+### Predictable, validated generation
+
+Nova's own generator (not the apps it produces) is built to fail safely and predictably:
+
+- Plugin selections are **validated before any file is written**, using declared metadata about what conflicts with what and what requires what.
+- Every generation runs as a planned sequence of operations; if something fails partway through, Nova **rolls back** the partially-created project directory instead of leaving a broken half-generated app on disk.
+- Every feature's `package.json` footprint (dependencies, devDependencies, scripts) is declared **exactly once** and consumed by both full generation and `nova add`, so the two paths can never quietly disagree about what a plugin installs.
+
+See [Generator Internals](#generator-internals) for details.
+
 ---
 
 ## Features
@@ -252,8 +271,9 @@ Nova provides a flexible foundation for building modern Next.js applications.
 - Observability and error tracking
 - Security features
 - Health and readiness endpoints
-- Extensible plugin architecture
+- Extensible plugin architecture with declared metadata and validation
 - Incremental feature addition to existing projects (`nova add`)
+- Plugin introspection from the CLI (`nova plugins`)
 
 ---
 
@@ -269,6 +289,8 @@ You can configure:
 4. Optional plugins and add-ons
 5. Dependency installation
 6. Git initialization
+
+Before any files are written, Nova validates your plugin selection against each plugin's declared constraints (requires/conflicts/supported UI libraries). If something's incompatible, you'll get a clear error instead of a partially broken project.
 
 After generation:
 
@@ -300,11 +322,12 @@ Your application is now ready for development.
 
 ## CLI Usage
 
-The Nova CLI has two entrypoints: generating a brand new project, and adding features to one that already exists.
+The Nova CLI has three entrypoints: generating a brand new project, adding features to one that already exists, and inspecting available plugins.
 
 ```text
 nova [project-name] [options]
 nova add <feature...> [options]
+nova plugins [feature]
 ```
 
 ### Options
@@ -328,6 +351,8 @@ nova my-app
 nova
 nova add prisma redis
 nova add tanstack-query --path ./my-app
+nova plugins
+nova plugins prisma
 ```
 
 Project names must contain only:
@@ -347,7 +372,7 @@ Invalid names (spaces, path separators, uppercase letters, `..`) are rejected be
 
 ### Running in CI
 
-When `CI` is set in the environment, Nova automatically skips the "install dependencies now?" confirmation prompt so the process can run non-interactively:
+When `CI` is set in the environment, Nova automatically skips the "install dependencies now?" confirmation prompt so the process can run non-interactively, and its internal logger switches to a quieter, CI-friendly output level:
 
 ```bash
 CI=true npx @darkalpha/nova my-app
@@ -397,16 +422,36 @@ Feature names accept either the camelCase key (`tanstackQuery`) or the kebab-cas
 1. Reads the target's `package.json` (the directory must already be a Node/Next.js project — `nova add` never creates a project itself).
 2. Detects whether the project keeps its code under `src/` or at the project root, and copies each addon's files accordingly — any file the addon authors under `src/...` is copied without the `src/` prefix when the target project has no `src/` directory.
 3. Creates whatever intermediate folders are needed (`lib/redis`, `emails/`, `.storybook/`, etc.) — nothing needs to exist beforehand.
-4. Merges the addon's `dependencies` / `devDependencies` into `package.json` (a newer pinned version wins), and adds any new `scripts` entries **without overwriting** a script you've already customized.
+4. Merges the addon's `dependencies` / `devDependencies` into `package.json` (a newer pinned version wins), and adds any new `scripts` entries **without overwriting** a script you've already customized. These additions come from a single shared source (`src/featureContributions.ts`) — the exact same data full generation uses, so a feature installs identically whether you selected it up front or added it later.
 5. Skips files that already exist in the project, so re-running `nova add` is safe — pass `--force` if you deliberately want the shipped template version back.
 
 ### Known limitations
 
 - Switching UI libraries (`mui`, `chakra`, `ant`, ...) isn't supported via `nova add` — that requires rewriting the app's provider tree, which is only handled during initial generation.
-- Config-file wiring that the generator applies automatically at scaffold time (e.g. `output: "standalone"` in `next.config.mjs` for Docker, or wrapping `next.config.mjs` for Sentry/PWA/Bundle Analyzer) is **not** re-applied by `nova add`. Files are copied and dependencies are added, but you may need to wire a couple of lines into `next.config.mjs` by hand — check that feature's `docs/*.md` in the generated project for the exact snippet.
+- Config-file wiring that the generator applies automatically at scaffold time (e.g. `output: "standalone"` in `next.config.mjs` for Docker, or wrapping `next.config.mjs`/`middleware.ts` for Sentry/PWA/Bundle Analyzer/Security Headers) is **not** re-applied by `nova add`. Files are copied and dependencies are added, but you may need to wire a couple of lines by hand — check that feature's `docs/*.md` in the generated project for the exact snippet.
 - Run your package manager's install command afterwards; `nova add` only updates `package.json`, it doesn't install anything.
 
 Full reference: `docs/nova-add-command.md` inside any generated project.
+
+---
+
+## Inspecting Plugins (`nova plugins`)
+
+Before adding a plugin — or just to understand what one already in your project does — you can ask the CLI directly instead of reading source files:
+
+```bash
+nova plugins
+```
+
+Lists every available plugin with its description, any `requires`/`conflicts` constraints, which UI libraries it's restricted to (if any), and a summary of what it adds to `package.json`.
+
+```bash
+nova plugins prisma
+```
+
+Shows the same detail for a single plugin.
+
+This command reads from the exact same metadata (`src/generator/pluginMetadata.ts`) and package contribution data (`src/featureContributions.ts`) that generation itself uses — there's nothing plugin-specific to keep in sync by hand, and the output can never drift from what `nova <name>` or `nova add` actually do.
 
 ---
 
@@ -475,7 +520,7 @@ Generated applications can include typed API clients with:
 
 Nova's plugin ecosystem is designed to be composable.
 
-The available options depend on the version of Nova you are using. Every plugin listed below can be selected either during initial generation, or added afterward with `nova add` (see [Adding Features to an Existing Project](#adding-features-to-an-existing-project-nova-add)).
+The available options depend on the version of Nova you are using. Every plugin listed below can be selected either during initial generation, or added afterward with `nova add` (see [Adding Features to an Existing Project](#adding-features-to-an-existing-project-nova-add)), and inspected at any time with `nova plugins` (see [Inspecting Plugins](#inspecting-plugins-nova-plugins)).
 
 ## Data and Backend
 
@@ -535,6 +580,8 @@ The available options depend on the version of Nova you are using. Every plugin 
 | Design and UX                 | Design System, Animations, Recharts                                                                                     |
 
 Each plugin is a self-contained overlay under `templates/addons/<name>`. Enabling it copies its files on top of the base template and automatically wires in the required dependencies, scripts, and environment variables — there's no manual wiring step after generation. The same addon folders back `nova add`, so a feature behaves identically whether you selected it at scaffold time or added it later.
+
+Each plugin also carries declarative metadata (`src/generator/pluginMetadata.ts`) describing its name, description, and any `requires`/`conflicts`/`supportedUI` constraints. Nova validates your full selection against this metadata **before writing any files**, so an incompatible combination fails fast with a clear error rather than partway through generation.
 
 ---
 
@@ -818,7 +865,24 @@ The Nova repository itself is organized as follows:
 │   ├── add.ts
 │   ├── prompts.ts
 │   ├── generator.ts
+│   ├── generator/
+│   │   ├── context.ts
+│   │   ├── logger.ts
+│   │   ├── errors.ts
+│   │   ├── hooks.ts
+│   │   ├── operations.ts
+│   │   ├── pluginMetadata.ts
+│   │   ├── pluginInfo.ts
+│   │   ├── validators.ts
+│   │   ├── verifyManifestSync.ts
+│   │   └── patchers/
+│   │       ├── types.ts
+│   │       ├── nextConfigPatcher.ts
+│   │       ├── providerPatcher.ts
+│   │       ├── middlewarePatcher.ts
+│   │       └── index.ts
 │   ├── addonRegistry.ts
+│   ├── featureContributions.ts
 │   ├── featurePackageAdditions.ts
 │   ├── packageMerge.ts
 │   ├── projectStructure.ts
@@ -839,26 +903,58 @@ The Nova repository itself is organized as follows:
 │   └── ui/
 │
 ├── scripts/
-│   └── smoke-test.mjs
+│   ├── smoke-test.mjs
+│   └── verify-package-manifest-sync.ts
 │
 └── docs/
     └── migration/
 ```
 
 - **`bin/nova.js`** — the published CLI entrypoint (used by `npm start` or `npx`).
-- **`src/index.ts`** — the CLI entrypoint; dispatches between the `nova [project-name]` generation flow and the `nova add <feature...>` flow.
-- **`src/generator.ts`** — high-level generator logic for brand-new projects: copies templates, applies add-ons, writes `package.json`, and patches generated files (Next.js config, providers, middleware, README) based on selected features.
+- **`src/index.ts`** — the CLI entrypoint; dispatches between the `nova [project-name]` generation flow, `nova add <feature...>`, and `nova plugins [feature]`.
+- **`src/generator.ts`** — high-level generation orchestration: validates the plugin selection, builds an operation plan (copy base template, copy selected addons, copy UI overlay), executes it with rollback on failure, writes `package.json`, and runs the config patchers and remaining single-purpose helpers (Storybook preview, DaisyUI Tailwind patch, README, lint-staged, docker-compose).
+- **`src/generator/`** — generator internals, one concern per module (see [Generator Internals](#generator-internals) below).
 - **`src/add.ts`** — the `nova add` implementation: copies addon files into an existing project (with `src/`-prefix remapping) and merges dependencies/scripts into its `package.json`.
-- **`src/addonRegistry.ts`** — single source of truth mapping each `FeatureKey` to its addon folder name, shared by both `generator.ts` and `add.ts` so they never disagree about where a feature's files live.
-- **`src/featurePackageAdditions.ts`** — per-feature `package.json` contributions (dependencies/devDependencies/scripts) used by `nova add`, kept in sync by hand with `packageManifest.ts`.
+- **`src/addonRegistry.ts`** — single source of truth mapping each `FeatureKey` to its addon folder name, shared by `generator.ts`, `add.ts`, and `pluginInfo.ts`.
+- **`src/featureContributions.ts`** — single source of truth for what each feature contributes to `package.json` (dependencies/devDependencies/scripts), consumed by full generation, `nova add`, and `nova plugins`.
+- **`src/featurePackageAdditions.ts`** — thin backward-compatible re-export of `featureContributions.ts` for any code still importing the old name.
 - **`src/packageMerge.ts`** — merges an addon's dependency/script additions into an existing project's `package.json` without clobbering scripts you've already customized.
 - **`src/projectStructure.ts`** — detects whether a target project uses a `src/` directory and remaps addon file paths accordingly for `nova add`.
 - **`src/prompts.ts`** — the interactive `@clack/prompts`-based CLI flow, shared between initial generation and the `nova add` feature multiselect.
-- **`src/packageManifest.ts`** — builds a brand-new generated project's `package.json` (scripts + dependencies) from the selected feature set.
+- **`src/packageManifest.ts`** — builds a brand-new generated project's `package.json` (scripts + dependencies) from the selected feature set and `featureContributions.ts`.
 - **`packages/core/`** — `@nova/core`, a framework-agnostic workspace package with zero feature-specific logic: template/filesystem copying, package-manager command resolution, prompt cancel-handling, and logging. Built once and bundled into the CLI at publish time.
 - **`templates/base/`** — the complete base Next.js App Router project that every generated app starts from.
 - **`templates/addons/`** — one folder per optional feature; each overlays files on top of `templates/base` when enabled, and is reused verbatim by `nova add`.
 - **`templates/ui/`** — one folder per alternative UI library, overlaid last so provider wiring and examples land correctly.
+- **`scripts/verify-package-manifest-sync.ts`** — regression guard confirming `packageManifest.ts`'s output for every feature matches `featureContributions.ts`; runs in CI and `prepublishOnly`.
+
+---
+
+## Generator Internals
+
+Nova's own generator (as distinct from the apps it produces) went through a Phase 1 hardening pass focused on making it robust, predictable, and easy to extend as more plugins are added. The pieces:
+
+| Module                                | Responsibility                                                                                                                                                                                                                                                                                     |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/generator/context.ts`            | Builds a single, frozen `GeneratorContext` (paths, resolved UI library, logger, dry-run flag) threaded through generation instead of recomputing values or relying on mutable module state.                                                                                                        |
+| `src/generator/logger.ts`             | A small structured logger (`debug`/`verbose`/`info`/`success`/`warn`/`error`/`step`) with a CI-aware minimum log level, replacing scattered `console.log` calls.                                                                                                                                   |
+| `src/generator/errors.ts`             | Typed error classes (`InvalidProjectNameError`, `DirectoryNotEmptyError`, `PluginConflictError`, `MissingPluginDependencyError`, `OperationExecutionError`, ...) so failures are identifiable and carry actionable messages instead of generic `Error`s.                                           |
+| `src/generator/pluginMetadata.ts`     | Declarative per-plugin metadata: name, description, `requires`, `conflicts`, `supportedUI`. The single place new cross-plugin constraints get declared.                                                                                                                                            |
+| `src/generator/validators.ts`         | `validatePluginSelection()` checks a feature selection against `pluginMetadata.ts` **before any files are written**.                                                                                                                                                                               |
+| `src/generator/pluginInfo.ts`         | Joins `addonRegistry.ts`, `pluginMetadata.ts`, and `featureContributions.ts` into one queryable view per plugin; powers `nova plugins`.                                                                                                                                                            |
+| `src/generator/operations.ts`         | Represents file operations (`mkdir`, `copyDir`, `writeFile`, `writeJson`) as plain data (an `OperationPlan`) rather than closures, executed sequentially by `executePlan()`. On failure, `rollbackTargetDir()` removes the partially-generated project directory instead of leaving it half-built. |
+| `src/generator/hooks.ts`              | A minimal `HookRegistry` supporting `beforeGenerate` / `afterGenerate` / `beforePlugin` / `afterPlugin` lifecycle hooks, so future commands can observe generation without editing generator internals.                                                                                            |
+| `src/generator/patchers/*.ts`         | Config patching for `next.config.mjs`, the provider tree (`app-providers.tsx`), and `middleware.ts`, expressed as ordered, declarative **contribution lists** (feature flag → transform) instead of inline `if` chains in `generator.ts`.                                                          |
+| `src/generator/verifyManifestSync.ts` | Regression guard confirming `buildPackageJson()`'s output matches `featureContributions.ts` per feature — exercised by `npm run verify:manifest-sync`.                                                                                                                                             |
+
+**Design principles carried through all of the above:**
+
+- **Single source of truth per concern.** A feature's package.json footprint lives in exactly one place (`featureContributions.ts`); a plugin's cross-plugin constraints live in exactly one place (`pluginMetadata.ts`); config patches live in exactly one place per target file (`patchers/*.ts`).
+- **Validate before writing.** Plugin selection is checked against declared constraints before the target directory is even created.
+- **Plan, then execute.** File operations are built as a data structure first and executed second, which is what makes rollback-on-failure possible and will make a future `--dry-run` flag a small addition rather than a rewrite.
+- **No behavior change for existing users.** Every refactor in this pass preserves byte-identical generated output for every existing feature/UI combination — verified against `scripts/smoke-test.mjs`.
+
+This foundation is what a future `nova doctor`, `nova upgrade`, or `nova remove` command would build on: `pluginInfo.ts` already answers "what does this plugin touch," `pluginMetadata.ts` already answers "what does this plugin require or conflict with," and the hook registry already gives a place to add cross-cutting behavior without touching `generator.ts` again.
 
 ---
 
@@ -898,11 +994,11 @@ Examples include:
 - `next.config.mjs`
 - `app-providers.tsx`
 
-The goal is to keep each plugin isolated, explicit, and easy to maintain. There is no deep merge logic — an overlay file simply replaces the base file at the same path, so it's always obvious, by reading the addon folder, exactly what it changes.
+The goal is to keep each plugin isolated, explicit, and easy to maintain. There is no deep merge logic for file overlays — an overlay file simply replaces the base file at the same path, so it's always obvious, by reading the addon folder, exactly what it changes. (Config _patching_ — as opposed to file overlaying — is handled separately and declaratively; see [Generator Internals](#generator-internals).)
 
 UI library overlays (`templates/ui/*`) are applied last, after all selected addons, so provider wiring (e.g. wrapping `<AppProviders>` with `<MuiProvider>` or `<ChakraAppProvider>`) is consistent regardless of which other addons were selected.
 
-The exact same `templates/addons/<name>` folders power `nova add`: when adding a feature to an existing project, Nova copies the same files, only remapping the `src/` prefix if the target project doesn't use a `src/` directory. The one thing `nova add` does **not** replay is the config-file patching step (`next.config.mjs`, `middleware.ts` wiring) that `generateProject` performs automatically — that patching logic lives in `src/generator.ts` and isn't (yet) exposed to the incremental flow, so some plugins may need a couple of lines wired in by hand after `nova add`.
+The exact same `templates/addons/<name>` folders power `nova add`: when adding a feature to an existing project, Nova copies the same files, only remapping the `src/` prefix if the target project doesn't use a `src/` directory. The one thing `nova add` does **not** replay is the config-patching step (`next.config.mjs`, `middleware.ts`, provider-tree wiring) that `generateProject` performs automatically — that logic lives in `src/generator/patchers/*.ts` and isn't (yet) exposed to the incremental flow, so some plugins may need a couple of lines wired in by hand after `nova add`.
 
 ---
 
@@ -952,6 +1048,14 @@ nova my-app                     # UI: shadcn, no plugins
 cd my-app
 nova add prisma betterAuth      # add auth + DB later
 nova add tanstackQuery sentry   # add data fetching + monitoring later
+```
+
+**Not sure what a plugin does before adding it**
+
+```bash
+nova plugins prisma
+nova plugins sentry
+nova add prisma sentry
 ```
 
 ---
@@ -1026,14 +1130,20 @@ Yes. Everything Nova writes is plain, readable TypeScript/React you own outright
 **Can I add a feature I skipped, without regenerating the whole project?**
 Yes — that's exactly what `nova add <feature...>` is for. Run it from inside the project (or point it at another directory with `--path`), and it copies the addon's files and merges its dependencies/scripts into your existing `package.json`. See [Adding Features to an Existing Project](#adding-features-to-an-existing-project-nova-add).
 
+**How do I know what a plugin will actually add before I run it?**
+Run `nova plugins <feature>`. It shows the plugin's description, any `requires`/`conflicts` constraints, supported UI libraries, and a summary of its `package.json` footprint — all sourced from the same data generation itself uses.
+
 **Does `nova add` overwrite files I've already customized?**
 No, by default it skips any file that already exists at the destination. Pass `--force` if you deliberately want the shipped template version back, overwriting your local changes.
+
+**What happens if generation fails partway through?**
+Nova rolls back: since it only ever generates into a directory it just created (or confirmed was empty), a failed generation removes that directory rather than leaving a half-built project behind.
 
 **Does Nova modify my project after generation, or phone home?**
 No. Nova runs once, at generation time (or once per `nova add` invocation), entirely locally. There's no CLI daemon, no telemetry, and no ongoing dependency on `nova`/`@darkalpha/nova` inside the generated app.
 
 **Can I use Nova in CI?**
-Yes — pass a project name as a CLI argument and set `CI=true` in the environment; Nova will skip the interactive "install now?" confirmation and generate non-interactively.
+Yes — pass a project name as a CLI argument and set `CI=true` in the environment; Nova will skip the interactive "install now?" confirmation, use a quieter log level, and generate non-interactively.
 
 **Which package managers are supported?**
 pnpm, npm, yarn, and bun. Whichever you choose during setup is used consistently for the generated scripts and documented install/dev commands in the project's own `README.md`.
@@ -1045,7 +1155,7 @@ The `templates/ui/<library>` overlay is applied after the base template and afte
 No — switching UI libraries requires rewriting the provider tree, which is only handled during initial generation. `nova add` will warn you if you pass a UI library name as a feature.
 
 **Can I add a plugin that isn't listed?**
-Yes — see [Adding a New Plugin](#adding-a-new-plugin). Plugins are just overlay folders under `templates/addons/<name>` plus a feature flag and a `package.json` patch, so adding one to a fork of Nova is a small, mechanical change, and it automatically becomes available to both the initial generator and `nova add`.
+Yes — see [Adding a New Plugin](#adding-a-new-plugin). Plugins are just overlay folders under `templates/addons/<name>` plus a feature flag, a metadata entry, and a `package.json` contribution, so adding one to a fork of Nova is a small, mechanical change, and it automatically becomes available to the initial generator, `nova add`, and `nova plugins`.
 
 ---
 
@@ -1062,6 +1172,9 @@ That means the destination file already existed. This is intentional so your cus
 
 **`nova add` warns "looks like a UI library, not a feature."**
 UI library switching (`mui`, `chakra`, `ant`, `mantine`, `hero`, `daisy`, `headless`) isn't supported incrementally — see [Known limitations](#adding-features-to-an-existing-project-nova-add).
+
+**Generation fails with a plugin conflict or missing-dependency error.**
+Nova validates your plugin selection against declared metadata before writing anything. Run `nova plugins <feature>` for each plugin involved to see its `requires`/`conflicts` list, then adjust your selection.
 
 **TypeScript can't resolve `@nova/core` while developing Nova itself.**
 Run `npm install` at the repository root first — `@nova/core` is a real workspace package, and both the editor's TypeScript server and `tsc --noEmit` need the workspace symlink (or the `paths` mapping in `tsconfig.json`) to resolve it.
@@ -1097,6 +1210,12 @@ Run type checking:
 npm run typecheck
 ```
 
+Verify the package manifest data hasn't drifted:
+
+```bash
+npm run verify:manifest-sync
+```
+
 Run the compiled CLI:
 
 ```bash
@@ -1109,9 +1228,9 @@ If the project uses the `@nova/core` workspace package, run `npm install` from t
 
 # Testing the Generator
 
-Nova includes end-to-end smoke tests for generated projects.
+Nova includes end-to-end smoke tests for generated projects, plus a dedicated regression guard for package manifest data.
 
-Run:
+Run the smoke tests:
 
 ```bash
 node scripts/smoke-test.mjs
@@ -1131,7 +1250,15 @@ Test scenarios may include:
 - Security headers
 - Docker Compose
 
-When adding or modifying a plugin, update the relevant smoke tests. If your change affects `nova add` behavior specifically (e.g. new package additions in `src/featurePackageAdditions.ts`), verify it manually against a scaffolded project until incremental-add coverage is added to the smoke suite.
+Run the manifest sync check:
+
+```bash
+npm run verify:manifest-sync
+```
+
+This confirms `buildPackageJson()`'s output for every feature matches `src/featureContributions.ts` — the single source of truth both full generation and `nova add` read from. Since both paths consume the same data, this should always pass; it exists as a regression guard against a future change accidentally bypassing that shared source.
+
+When adding or modifying a plugin, update the relevant smoke tests. If your change affects `nova add` behavior specifically (e.g. new package additions in `src/featureContributions.ts`), verify it manually against a scaffolded project until incremental-add coverage is added to the smoke suite.
 
 ---
 
@@ -1151,37 +1278,57 @@ templates/addons/<plugin-name>
 src/types.ts
 ```
 
-3. Register the plugin in:
+3. Register the plugin's addon folder in:
+
+```text
+src/addonRegistry.ts
+```
+
+4. Register the plugin in the CLI's overlay list in:
 
 ```text
 src/generator.ts
 ```
 
-4. Add dependencies and scripts to:
+5. Add the plugin's dependencies and scripts **once**, in:
 
 ```text
-src/packageManifest.ts
+src/featureContributions.ts
 ```
 
-5. Add the same dependencies/scripts to `src/featurePackageAdditions.ts` so `nova add` stays in sync with full-generation behavior.
+Both `src/packageManifest.ts` (full generation) and `nova add` read from this file automatically — there is nothing further to duplicate.
 
-6. Register the feature's folder name in `src/addonRegistry.ts` if it differs from the default kebab-case conversion.
+6. Add descriptive metadata, and any real `requires`/`conflicts`/`supportedUI` constraints, in:
 
-7. Add plugin-specific environment variables.
+```text
+src/generator/pluginMetadata.ts
+```
 
-8. Add documentation.
+This also makes the plugin show up correctly in `nova plugins`.
 
-9. Add smoke tests.
+7. If the plugin needs to patch `next.config.mjs`, the provider tree, or `middleware.ts`, add a contribution to the relevant file in:
 
-10. Verify that the plugin works independently, both via `nova <name>` and via `nova add <plugin-name>` against an existing project.
+```text
+src/generator/patchers/
+```
 
-11. Verify compatibility with related plugins.
+rather than adding a new `if` branch to `generator.ts`.
 
-12. Run the complete test suite.
+8. Add plugin-specific environment variables (to `.env.example` in the relevant template, and document them).
 
-Keep templates and dependency configuration synchronized across `packageManifest.ts` and `featurePackageAdditions.ts`.
+9. Add documentation (a `docs/<plugin>.md` in the generated project, plus a mention in this README's plugin tables).
 
-A plugin that generates files without adding required dependencies, or adds dependencies without generating the required files, is usually a bug — and if the two dependency-manifest files drift apart, `nova add` and full generation will silently produce different `package.json` output for the same feature.
+10. Add smoke tests in `scripts/smoke-test.mjs`.
+
+11. Run `npm run verify:manifest-sync` to confirm the plugin's package.json contribution is consistent.
+
+12. Verify that the plugin works independently, both via `nova <name>` and via `nova add <plugin-name>` against an existing project, and check `nova plugins <plugin-name>` renders sensibly.
+
+13. Verify compatibility with related plugins.
+
+14. Run the complete test suite (`npm run typecheck && npm run verify:manifest-sync && node scripts/smoke-test.mjs`).
+
+Because a feature's package.json contribution now lives in exactly one file (`src/featureContributions.ts`), it's no longer possible for full generation and `nova add` to silently drift apart for a given plugin — `npm run verify:manifest-sync` exists specifically to catch a regression here.
 
 ---
 
@@ -1194,6 +1341,7 @@ Before submitting changes:
 ```bash
 npm install
 npm run typecheck
+npm run verify:manifest-sync
 npm run build
 node scripts/smoke-test.mjs
 ```
@@ -1202,15 +1350,24 @@ When contributing a new plugin or UI integration:
 
 - Keep the plugin isolated.
 - Avoid unnecessary dependencies.
-- Follow the existing architecture.
+- Follow the existing architecture (see [Generator Internals](#generator-internals)).
+- Declare package.json contributions once, in `src/featureContributions.ts`.
+- Declare plugin metadata and any real constraints in `src/generator/pluginMetadata.ts`.
+- Prefer a new patcher contribution in `src/generator/patchers/` over a new `if` branch in `generator.ts`.
 - Update documentation.
 - Add tests.
 - Add smoke-test coverage.
 - Document plugin conflicts and dependencies.
 - Keep generated applications production-ready.
-- If your plugin adds dependencies or scripts, update both `src/packageManifest.ts` and `src/featurePackageAdditions.ts` so `nova add` matches full generation.
+- Run `npm run verify:manifest-sync` before opening a PR that touches package.json contributions.
 
 Prefer small, focused changes.
+
+---
+
+## Changelog
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for a full history of changes to Nova itself (not the projects it generates).
 
 ---
 
