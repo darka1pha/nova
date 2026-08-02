@@ -21,9 +21,10 @@
     "build": "npm run build --workspace=@nova/core && tsup",
     "dev": "tsx ./src/index.ts",
     "prepack": "npm run build",
-    "prepublishOnly": "npm run typecheck && npm run build",
+    "prepublishOnly": "npm run typecheck && npm run verify:manifest-sync && npm run build",
     "start": "node ./bin/nova.js",
-    "typecheck": "npm run typecheck --workspace=@nova/core && tsc --noEmit"
+    "typecheck": "npm run typecheck --workspace=@nova/core && tsc --noEmit",
+    "verify:manifest-sync": "tsx scripts/verify-package-manifest-sync.ts"
   },
   "keywords": [
     "nextjs",
