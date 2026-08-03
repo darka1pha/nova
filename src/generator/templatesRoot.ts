@@ -19,23 +19,24 @@ import path from "node:path";
  *    is just one level up (`../templates`).
  *  - any other build/packaging layout that might be introduced later.
  *
- * Hard-coding either depth breaks the other environment (this is exactly
- * what caused `ENOENT ... lstat '.../templates/base'` in CI, where the
- * two-levels-up assumption walked past the repo root). Walking upward and
- * checking for the actual folder on disk is layout-agnostic and self-
- * correcting.
- *
- * If no ancestor contains a `templates/base` folder (e.g. templates truly
- * don't exist), this falls back to the historical two fixed-depth
- * candidates so that any resulting "template not found" error still points
- * at a sensible, previously-expected path rather than an arbitrary one.
+ * IMPORTANT: this function used to fall back to a *guessed* path
+ * (`../../templates`) when the walk-up search failed, and return that
+ * guess even if it didn't exist on disk. That produced exactly the kind of
+ * confusing failure we hit in CI: a downstream `ENOENT` on some
+ * plausible-looking-but-wrong path, with zero information about what was
+ * actually searched. This version instead throws immediately, listing
+ * every directory it checked, so a failure here is self-diagnosing instead
+ * of surfacing three call frames later as an opaque `lstat` error.
  */
 export function resolveTemplatesRoot(startDir: string): string {
-  const MAX_LEVELS = 8;
+  const MAX_LEVELS = 10;
+  const checked: string[] = [];
 
   let dir = startDir;
   for (let i = 0; i < MAX_LEVELS; i++) {
     const candidate = path.join(dir, "templates");
+    checked.push(path.join(candidate, "base"));
+
     if (fs.existsSync(path.join(candidate, "base"))) {
       return candidate;
     }
@@ -45,16 +46,13 @@ export function resolveTemplatesRoot(startDir: string): string {
     dir = parent;
   }
 
-  const fallbackCandidates = [
-    path.join(startDir, "..", "..", "templates"),
-    path.join(startDir, "..", "templates"),
-  ];
-
-  for (const candidate of fallbackCandidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  return fallbackCandidates[0];
+  throw new Error(
+    `Could not locate the "templates/base" directory starting from "${startDir}".\n` +
+    `Checked the following candidates, none of which exist:\n` +
+    checked.map((c) => `  - ${c}`).join("\n") +
+    `\n\nThis usually means either:\n` +
+    `  1. "dist/" is stale and needs a fresh "npm run build" after a template/source change, or\n` +
+    `  2. the "templates/" directory is missing from this checkout (verify it wasn't excluded ` +
+    `by a shallow/sparse checkout, and that it's present in the commit being tested).`,
+  );
 }
