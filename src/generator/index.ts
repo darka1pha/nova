@@ -9,6 +9,7 @@ import { DirectoryNotEmptyError, InvalidProjectNameError } from "./errors.js";
 import { HookRegistry } from "./hooks.js";
 import { executePlan, rollbackTargetDir, type OperationPlan } from "./operations.js";
 import { patchAppProviders, patchMiddleware, patchNextConfig } from "./patchers/index.js";
+import { resolveTemplatesRoot } from "./templatesRoot.js";
 import { validatePluginSelection } from "./validators.js";
 import { buildPackageJson } from "../packageManifest.js";
 import { isValidProjectName } from "../prompts.js";
@@ -20,10 +21,13 @@ import type {
   UiLibrary,
 } from "../types.js";
 
-// This file lives at src/generator/index.ts, so __dirname is src/generator/ -
-// two levels up from the repo root, where templates/ lives.
+// This file lives at src/generator/index.ts in dev, but tsup's named
+// entries build it to the flat dist/generator.js (see tsup.config.ts), so
+// __dirname is one level shallower once built. resolveTemplatesRoot()
+// checks both possible depths - see templatesRoot.ts for the full
+// explanation of why a single hard-coded "../.." broke CI.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_ROOT = path.join(__dirname, "..", "..", "templates");
+const TEMPLATES_ROOT = resolveTemplatesRoot(__dirname);
 const BASE_DIR = path.join(TEMPLATES_ROOT, "base");
 // Exported so src/add.ts can reuse the exact same addon templates when
 // adding a feature to an already-existing project.

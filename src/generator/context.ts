@@ -3,10 +3,13 @@ import { fileURLToPath } from "node:url";
 
 import type { Answers, UiLibrary } from "../types.js";
 import { createLogger, type Logger } from "./logger.js";
+import { resolveTemplatesRoot } from "./templatesRoot.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// src/generator/context.ts -> ../../templates
-const TEMPLATES_ROOT = path.join(__dirname, "..", "..", "templates");
+// Resolves to ../../templates in dev (src/generator/context.ts) or
+// ../templates in the built, flat dist/generator.js - see
+// templatesRoot.ts for why both depths need to be supported.
+const TEMPLATES_ROOT = resolveTemplatesRoot(__dirname);
 
 export interface GeneratorPaths {
   readonly templatesRoot: string;
