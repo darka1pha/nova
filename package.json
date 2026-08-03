@@ -18,12 +18,14 @@
     "node": ">=18.18.0"
   },
   "scripts": {
-    "build": "npm run build --workspace=@nova/core && tsup",
+    "build:core": "tsc -p packages/core/tsconfig.json",
+    "typecheck:core": "tsc --noEmit -p packages/core/tsconfig.json",
+    "build": "tsc -p packages/core/tsconfig.json && tsup",
     "dev": "tsx ./src/index.ts",
-    "prepack": "npm run build",
-    "prepublishOnly": "npm run typecheck && npm run verify:manifest-sync && npm run build",
+    "prepack": "tsc -p packages/core/tsconfig.json && tsup",
+    "prepublishOnly": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit && tsx scripts/verify-package-manifest-sync.ts && tsc -p packages/core/tsconfig.json && tsup",
     "start": "node ./bin/nova.js",
-    "typecheck": "npm run typecheck --workspace=@nova/core && tsc --noEmit",
+    "typecheck": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit",
     "verify:manifest-sync": "tsx scripts/verify-package-manifest-sync.ts"
   },
   "keywords": [

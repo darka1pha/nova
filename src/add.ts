@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { ADDON_FOLDERS, resolveFeatureKey } from "./addonRegistry.js";
 import { FEATURE_PACKAGE_ADDITIONS } from "./featurePackageAdditions.js";
-import { ADDONS_DIR } from "./generator.js";
+import { ADDONS_DIR } from "./generator/index.js";
 import { mergePackageAdditions, readPackageJson, writePackageJson } from "./packageMerge.js";
 import { copyAddonWithRemap, hasSrcDirectory } from "./projectStructure.js";
 import type { FeatureKey } from "./types.js";

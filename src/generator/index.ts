@@ -20,8 +20,10 @@ import type {
   UiLibrary,
 } from "../types.js";
 
+// This file lives at src/generator/index.ts, so __dirname is src/generator/ -
+// two levels up from the repo root, where templates/ lives.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_ROOT = path.join(__dirname, "..", "templates");
+const TEMPLATES_ROOT = path.join(__dirname, "..", "..", "templates");
 const BASE_DIR = path.join(TEMPLATES_ROOT, "base");
 // Exported so src/add.ts can reuse the exact same addon templates when
 // adding a feature to an already-existing project.
@@ -49,7 +51,7 @@ export async function generateProject(
   }
 
   // Validate the plugin selection before touching the filesystem at all -
-  // see src/pluginMetadata.ts for the declared constraints.
+  // see src/generator/pluginMetadata.ts for the declared constraints.
   validatePluginSelection(answers.features);
 
   await hooks.run("beforeGenerate", context);
