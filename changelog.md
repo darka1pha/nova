@@ -22,6 +22,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 - **`src/generator/patchers/`** — declarative config-patching system for `next.config.mjs` (`nextConfigPatcher.ts`), the provider tree (`providerPatcher.ts`), and `middleware.ts` (`middlewarePatcher.ts`), each expressed as an ordered list of feature-gated contributions instead of inline `if` chains previously embedded in `generator.ts`. `middlewarePatcher.ts` also introduces an explicit idempotency marker so re-applying a middleware contribution can never double-wrap the exported handler.
 - **`src/featureContributions.ts`** — single source of truth for every feature's `package.json` contribution (dependencies, devDependencies, scripts). Both `src/packageManifest.ts` (full generation) and `nova add` now read from this one map.
 - **`src/generator/verifyManifestSync.ts`** and **`scripts/verify-package-manifest-sync.ts`** — a regression guard (`npm run verify:manifest-sync`) confirming `buildPackageJson()`'s per-feature output matches `featureContributions.ts`. Wired into `npm run prepublishOnly` and the CI `verify` job.
+- **`.github/workflows/npm-publish.yml`** — the `release` job now also runs on manual `workflow_dispatch` runs (previously it only ran on `git push` of a `v*` tag and showed as skipped on any manual dispatch). A new `Resolve release tag` step derives the release tag from `package.json`'s version on manual dispatches (since `github.ref_name` is a branch name, not a version tag, in that case), while continuing to use the pushed tag directly on tag-push runs.
 
 ### Changed
 
@@ -34,12 +35,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 - Eliminated the possibility of `src/packageManifest.ts` (full generation) and `src/featurePackageAdditions.ts`/`nova add` silently disagreeing about a feature's dependencies or scripts. Previously these were two hand-maintained files that had to be kept in sync manually (see prior `docs/nova-add-command.md` and README warnings about this); they now derive from the same `featureContributions.ts` map, so this class of drift is structurally impossible rather than merely detected.
 - A failed `generateProject()` call no longer leaves a partially-generated project directory on disk — the target directory (which Nova only ever creates fresh, or confirms was empty beforehand) is now removed automatically on failure.
+- **`src/generator/templatesRoot.ts`**'s `resolveTemplatesRoot()` no longer silently falls back to a guessed, possibly-nonexistent `templates/` path when it can't find `templates/base` by walking up from the calling file's directory. Previously, when the walk-up search failed, the function returned an unverified fallback candidate anyway, which surfaced downstream as a confusing `ENOENT ... lstat '.../templates/base'` error deep inside `executePlan()` (e.g. in CI, during `scripts/smoke-test.mjs`) with no indication of what had actually been searched. It now throws immediately with the full list of directories it checked, making a resolution failure self-diagnosing (stale `dist/` build vs. genuinely missing `templates/` directory) instead of requiring a debugging session to track down.
 
 ### Internal / Non-breaking
 
 - No changes to generated project output. Every refactor in this release preserves byte-identical files for every existing feature/UI-library combination, verified against `scripts/smoke-test.mjs`.
 - No changes to any existing CLI command's arguments, flags, exit codes, or observable behavior. `nova <name>`, `nova add`, `-h`/`--help`, and `-v`/`--version` all behave exactly as before; `nova plugins` is purely additive.
 - `docs/migration/phase-2-core-extraction.md`-style deprecation shims (`src/utils/copyTemplate.ts`, `src/utils/pmCommands.ts`) are unaffected by this pass.
+- Removed unused local one-off scripts (`scripts/fix-client-auth.js`, `scripts/fix-client-auth.cjs`) that were never referenced by `package.json`, `tsup.config.ts`, or CI, and hard-coded an absolute Windows path — dead weight left over from a one-time local repair.
 
 ---
 

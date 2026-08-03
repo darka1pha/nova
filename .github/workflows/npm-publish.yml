@@ -90,7 +90,12 @@ jobs:
     name: GitHub Release
     needs: publish
 
-    if: github.event_name == 'push'
+    # Runs on both a tag push AND a manual "Run workflow" dispatch.
+    # On workflow_dispatch, github.ref_name is whatever branch the run was
+    # triggered against (e.g. "main"), not a version tag, so tag_name below
+    # is derived from package.json's version instead of github.ref_name to
+    # stay correct in both cases.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     runs-on: ubuntu-latest
 
@@ -100,10 +105,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Resolve release tag
+        id: resolve_tag
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            TAG="v${VERSION}"
+          fi
+          echo "Resolved release tag: $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ steps.resolve_tag.outputs.tag }}
           generate_release_notes: true
           make_latest: true
           draft: false
