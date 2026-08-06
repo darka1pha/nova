@@ -63,5 +63,5 @@ Baseline referenced by this changelog's `[Unreleased]` section. See git history 
 
 ---
 
-[Unreleased]: https://github.com/darka1pha/nova/compare/v0.1.5...HEAD
-[0.1.5]: https://github.com/darka1pha/nova/releases/tag/v0.1.5
+[Unreleased]: https://github.com/darka1pha/nova/compare/v0.1.6...HEAD
+[0.1.5]: https://github.com/darka1pha/nova/releases/tag/v0.1.6
