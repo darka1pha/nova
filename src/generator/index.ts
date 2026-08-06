@@ -4,6 +4,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { ADDON_FOLDERS } from "../addonRegistry.js";
+import { appendPluginEnvContributions } from "../plugin/applyEnv.js";
+import { writePluginDocs } from "../plugin/applyDocs.js";
+import { applyPluginPatches } from "../plugin/applyPatches.js";
+import { getPluginRegistry } from "../plugin/legacyAdapter.js";
+import type { PluginResolutionContext } from "../plugin/types.js";
 import { buildGeneratorContext } from "./context.js";
 import { DirectoryNotEmptyError, InvalidProjectNameError } from "./errors.js";
 import { HookRegistry } from "./hooks.js";
@@ -107,6 +112,34 @@ export async function generateProject(
     await patchNextConfig(targetDir, answers.features);
     await patchAppProviders(targetDir, answers.features, uiLibrary);
     await patchMiddleware(targetDir, answers.features);
+
+    // Everything below this point drives off the Phase 2 plugin registry
+    // rather than generator-owned, per-feature arrays: patches, env vars,
+    // and docs a plugin declares on its own manifest (see src/plugin/).
+    // Plugins that haven't migrated a given contribution (most, for now)
+    // simply have an empty/undefined array here and these calls are
+    // no-ops for them.
+    const pluginRegistry = getPluginRegistry();
+    const enabledPluginIds = (Object.entries(answers.features) as [FeatureKey, boolean][])
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => key);
+
+    const pluginContext: PluginResolutionContext = {
+      projectName: answers.projectName,
+      packageManager: answers.packageManager,
+      uiLibrary,
+      enabledPlugins: enabledPluginIds,
+      answers: answers.pluginAnswers ?? {},
+    };
+
+    logger.step("Applying plugin-declared patches");
+    await applyPluginPatches(targetDir, enabledPluginIds, pluginRegistry, pluginContext);
+
+    logger.step("Merging plugin-declared environment variables");
+    await appendPluginEnvContributions(targetDir, enabledPluginIds, pluginRegistry);
+
+    logger.step("Writing plugin-declared documentation");
+    await writePluginDocs(targetDir, enabledPluginIds, pluginRegistry, pluginContext);
 
     if (answers.features.storybook) {
       logger.step("Patching Storybook preview");

@@ -6,34 +6,24 @@ import type { MiddlewareContribution } from "./types.js";
 
 /**
  * Middleware contributions, gated by a feature flag and guarded by a
- * marker string so re-running generation (or a future `nova add`
- * middleware step) never double-wraps the exported handler. New plugins
- * that need to touch `src/middleware.ts` register here.
+ * marker string so re-running generation never double-wraps the exported
+ * handler. New plugins that need to touch `src/middleware.ts` should
+ * prefer declaring a `PatchContribution` on their own `PluginManifest`
+ * (see `src/plugin/types.ts` and `src/plugin/applyPatches.ts`) instead of
+ * adding an entry here - this array is kept only for any transform that
+ * hasn't migrated to a plugin manifest yet.
+ *
+ * `securityHeaders` previously lived here; it has migrated to
+ * `src/plugin/nativePlugins/securityHeaders.ts` and is now applied by
+ * `applyPluginPatches()` in `src/generator/index.ts` instead of by this
+ * function, with an identical transform/marker so generated output is
+ * unchanged.
  */
-const MIDDLEWARE_CONTRIBUTIONS: MiddlewareContribution[] = [
-  {
-    feature: "securityHeaders",
-    marker: "@/lib/security-headers",
-    transform: (content) =>
-      content
-        .replace(
-          'import createMiddleware from "next-intl/middleware";',
-          'import createMiddleware from "next-intl/middleware";\nimport { applySecurityHeaders } from "@/lib/security-headers";',
-        )
-        .replace(
-          "export default createMiddleware(routing);",
-          `const __nova_next_middleware = createMiddleware(routing);
-
-export default async function middleware(request) {
-  const response = await __nova_next_middleware(request);
-  try { applySecurityHeaders(response); } catch (e) { /* noop */ }
-  return response;
-}`,
-        ),
-  },
-];
+const MIDDLEWARE_CONTRIBUTIONS: MiddlewareContribution[] = [];
 
 export async function patchMiddleware(targetDir: string, features: FeatureFlags): Promise<void> {
+  if (MIDDLEWARE_CONTRIBUTIONS.length === 0) return;
+
   const middlewarePath = path.join(targetDir, "src", "middleware.ts");
   if (!(await fs.pathExists(middlewarePath))) return;
 

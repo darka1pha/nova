@@ -2,6 +2,8 @@ import { bail, type PackageManager } from "@nova/core";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 
+import { getPluginRegistry } from "./plugin/legacyAdapter.js";
+import { runPluginPrompts } from "./plugin/prompts.js";
 import type { Answers, FeatureKey, UiLibrary } from "./types.js";
 
 // Shared with src/index.ts validation for CLI-argument project names so
@@ -142,6 +144,15 @@ export async function collectAnswers(cliProjectName?: string): Promise<Answers> 
 
   const featureSet = new Set(Array.isArray(features) ? features : []);
 
+  // Ask each selected plugin's own prompts (if it declares any) right
+  // after the feature selection, so plugin-specific follow-up questions
+  // (e.g. Prisma's database provider) appear in a natural place in the
+  // flow instead of being hardcoded here. Plugins with no `prompts`
+  // contribute nothing and add no extra steps - see
+  // src/plugin/prompts.ts.
+  const pluginRegistry = getPluginRegistry();
+  const pluginAnswers = await runPluginPrompts(Array.from(featureSet), pluginRegistry);
+
   return {
     projectName,
     packageManager,
@@ -177,5 +188,6 @@ export async function collectAnswers(cliProjectName?: string): Promise<Answers> 
       recharts: featureSet.has("recharts"),
       tiptap: featureSet.has("tiptap"),
     },
+    pluginAnswers,
   };
 }

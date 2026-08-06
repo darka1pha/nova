@@ -1,5 +1,7 @@
 import type { PackageManager } from "@nova/core";
 
+import type { PluginAnswers } from "./plugin/types.js";
+
 export type FeatureKey =
   | "prisma"
   | "betterAuth"
@@ -48,6 +50,16 @@ export interface Answers {
   installNow: boolean;
   initGit: boolean;
   features: FeatureFlags;
+  /**
+   * Answers collected from each selected plugin's own `prompts` (see
+   * `src/plugin/prompts.ts`), keyed by plugin id then prompt name. Empty
+   * (`{}`) when no selected plugin declares any prompts - which, for now,
+   * is every plugin except the Phase 2 native examples in
+   * `src/plugin/nativePlugins/`. Optional so any code constructing
+   * `Answers` before this field existed (e.g. `scripts/smoke-test.mjs`)
+   * keeps compiling unchanged.
+   */
+  pluginAnswers?: PluginAnswers;
 }
 
 export interface GenerateProjectOptions {
