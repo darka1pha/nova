@@ -48,6 +48,7 @@ nova plugins prisma
 - [Features](#features)
 - [Creating a Project](#creating-a-project)
 - [CLI Usage](#cli-usage)
+- [Project Maintenance](#project-maintenance)
 - [Adding Features to an Existing Project (`nova add`)](#adding-features-to-an-existing-project-nova-add)
 - [Inspecting Plugins (`nova plugins`)](#inspecting-plugins-nova-plugins)
 - [What's Included](#whats-included)
@@ -343,11 +344,12 @@ nova search <term>
 -v, --version    Print the installed version
 ```
 
-### Add options
+### Common options
 
 ```text
 --path, -p <dir>   Target project directory (default: current directory)
 --force, -f        Overwrite files that already exist instead of skipping them
+--json             Print structured output (maintenance and discovery commands)
 ```
 
 ### Examples
@@ -363,6 +365,7 @@ nova init --path ./my-app
 nova doctor --path ./my-app
 nova remove prisma --path ./my-app
 nova search database
+nova status --path ./my-app --json
 ```
 
 `nova init` creates `.nova.json`, Nova's project manifest. New projects and `nova add` create it automatically. It records selected plugins and lets `remove`, `validate`, `doctor`, and `upgrade` operate without guessing from user source files. `remove` intentionally preserves generated files; it removes only tracked package entries and manifest metadata.
@@ -391,6 +394,35 @@ CI=true npx @darkalpha/nova my-app
 ```
 
 You'll still want to run the package manager's install command afterward as a separate CI step.
+
+---
+
+## Project Maintenance
+
+Nova tracks its own changes in a small `.nova.json` manifest. It is created automatically for new projects and after `nova add`; use `nova init` once to adopt an existing compatible project. The manifest records the package manager, UI library, and plugins selected through Nova. It does not claim ownership of handwritten application code.
+
+| Command | Purpose |
+| --- | --- |
+| `nova status` | Show project identity and a health summary. |
+| `nova doctor` | Check Node.js, package metadata, required files, lockfile presence, and plugin validation. |
+| `nova validate` | Run plugin validations without writing project files. |
+| `nova info` | Print project, framework, package-manager, UI, and tracked-plugin details. |
+| `nova list --installed` | List only plugins recorded in the target project's manifest. |
+| `nova remove <plugin>` | Remove tracked package entries and manifest metadata; generated files remain intact. |
+| `nova upgrade` | Reconcile tracked plugin dependency declarations with Nova's current manifests. |
+| `nova repair` | Repair deterministic metadata drift and a missing `.env.example`. |
+| `nova diff` | Report detectable baseline drift, such as missing baseline files or unavailable plugin metadata. |
+| `nova clean [--dry-run]` | Remove generated caches such as `.next`, `.turbo`, and Nova cache files. |
+
+Maintenance commands accept `--path <dir>`. Discovery and maintenance commands also support `--json`, making them suitable for CI checks:
+
+```bash
+nova doctor --path ./my-app --json
+nova status --path ./my-app --json
+nova clean --path ./my-app --dry-run --json
+```
+
+`nova remove` is intentionally conservative: it never deletes generated source or configuration files, because they may have been edited after generation. Review those files separately after removing a plugin, then run your package manager's install command.
 
 ---
 
@@ -436,6 +468,8 @@ Feature names accept either the camelCase key (`tanstackQuery`) or the kebab-cas
 3. Creates whatever intermediate folders are needed (`lib/redis`, `emails/`, `.storybook/`, etc.) — nothing needs to exist beforehand.
 4. Merges the addon's `dependencies` / `devDependencies` into `package.json` (a newer pinned version wins), and adds any new `scripts` entries **without overwriting** a script you've already customized. These additions come from a single shared source (`src/featureContributions.ts`) — the exact same data full generation uses, so a feature installs identically whether you selected it up front or added it later.
 5. Skips files that already exist in the project, so re-running `nova add` is safe — pass `--force` if you deliberately want the shipped template version back.
+
+Plugin lifecycle hooks and any plugin-declared templates, patches, environment variables, and documentation run as part of `nova add`. Successful additions are recorded in `.nova.json` for safe later maintenance.
 
 ### Known limitations
 
