@@ -322,12 +322,17 @@ Your application is now ready for development.
 
 ## CLI Usage
 
-The Nova CLI has three entrypoints: generating a brand new project, adding features to one that already exists, and inspecting available plugins.
+Nova supports project creation, plugin management, and safe project maintenance.
 
 ```text
 nova [project-name] [options]
 nova add <feature...> [options]
 nova plugins [feature]
+nova remove <plugin...> [--path <dir>] [--force]
+nova init | info | doctor | validate | clean | diff [--path <dir>]
+nova upgrade | repair [--path <dir>]
+nova list [search-term]
+nova search <term>
 ```
 
 ### Options
@@ -353,7 +358,13 @@ nova add prisma redis
 nova add tanstack-query --path ./my-app
 nova plugins
 nova plugins prisma
+nova init --path ./my-app
+nova doctor --path ./my-app
+nova remove prisma --path ./my-app
+nova search database
 ```
+
+`nova init` creates `.nova.json`, Nova's project manifest. New projects and `nova add` create it automatically. It records selected plugins and lets `remove`, `validate`, `doctor`, and `upgrade` operate without guessing from user source files. `remove` intentionally preserves generated files; it removes only tracked package entries and manifest metadata.
 
 Project names must contain only:
 

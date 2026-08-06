@@ -16,6 +16,7 @@ import { runPluginPrompts } from "./plugin/prompts.js";
 import { runPluginHook } from "./plugin/runHooks.js";
 import type { PluginResolutionContext } from "./plugin/types.js";
 import { validatePlugins } from "./plugin/validate.js";
+import { initializeProjectConfig } from "./project.js";
 import { copyAddonWithRemap, hasSrcDirectory } from "./projectStructure.js";
 import type { FeatureKey, UiLibrary } from "./types.js";
 
@@ -337,6 +338,8 @@ export async function addFeaturesToProject(
 
   await runPluginHook("afterComplete", orderedFeatures, registry, pluginContext);
   await runPluginHook("afterGenerate", orderedFeatures, registry, pluginContext);
+
+  await initializeProjectConfig(targetDir, orderedFeatures);
 
   return { targetDir, usesSrcDir, outcomes, unknownFeatures, dependencyIssues };
 }

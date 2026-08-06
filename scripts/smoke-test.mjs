@@ -97,6 +97,12 @@ const pkg = await fs.readJson(path.join(result.targetDir, "package.json"));
 console.log("scripts:", Object.keys(pkg.scripts));
 console.log("lint-staged present:", Boolean(pkg["lint-staged"]));
 
+const novaConfig = await fs.readJson(path.join(result.targetDir, ".nova.json"));
+if (novaConfig.packageManager !== fullAnswers.packageManager || !novaConfig.plugins.includes("prisma")) {
+  console.error("INVALID NOVA PROJECT METADATA", novaConfig);
+  process.exit(1);
+}
+
 const nextConfig = await fs.readFile(path.join(result.targetDir, "next.config.mjs"), "utf8");
 console.log("--- next.config.mjs ---");
 console.log(nextConfig);

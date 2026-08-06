@@ -26,6 +26,7 @@ import { resolveTemplatesRoot } from "./templatesRoot.js";
 import { validatePluginSelection } from "./validators.js";
 import { buildPackageJson } from "../packageManifest.js";
 import { isValidProjectName } from "../prompts.js";
+import { initializeProjectConfig } from "../project.js";
 import type {
   Answers,
   FeatureFlags,
@@ -220,6 +221,13 @@ export async function generateProject(
     }
     throw error;
   }
+
+  // Project metadata belongs to the generator contract, not only the CLI
+  // wrapper, so programmatic consumers get the same maintenance lifecycle.
+  await initializeProjectConfig(targetDir, enabledPluginIds, {
+    packageManager: answers.packageManager,
+    uiLibrary: answers.uiLibrary,
+  });
 
   await hooks.run("afterGenerate", context);
   await runPluginHook("afterGenerate", enabledPluginIds, pluginRegistry, pluginContext);
