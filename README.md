@@ -330,6 +330,7 @@ nova add <feature...> [options]
 nova plugins [feature]
 nova remove <plugin...> [--path <dir>] [--force]
 nova init | info | doctor | validate | clean | diff [--path <dir>]
+nova status [--path <dir>] [--json]
 nova upgrade | repair [--path <dir>]
 nova list [search-term]
 nova search <term>

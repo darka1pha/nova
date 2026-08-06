@@ -91,6 +91,14 @@ export function listPlugins(query?: string): ReturnType<typeof listAllPluginInfo
   return listAllPluginInfo().filter((plugin) => !needle || [plugin.key, plugin.folder, plugin.metadata.name, plugin.metadata.description, getPluginRegistry().getPlugin(plugin.key)?.category].join(" ").toLowerCase().includes(needle));
 }
 
+/** Returns plugin manifests explicitly tracked by a project, not merely
+ * dependencies which could have been installed independently. */
+export async function listInstalledPlugins(targetDir: string): Promise<ReturnType<typeof listAllPluginInfo>> {
+  const { config } = await project(targetDir);
+  const installed = new Set(config.plugins);
+  return listAllPluginInfo().filter((plugin) => installed.has(plugin.key));
+}
+
 export async function cleanProject(targetDir: string, dryRun = false): Promise<string[]> {
   await readProjectPackage(targetDir); const candidates = [".next", ".turbo", "node_modules/.cache", ".nova/cache"];
   const found: string[] = [];
