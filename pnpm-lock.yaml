@@ -68,7 +68,7 @@ packages:
     resolution: {integrity: sha512-6b9Ab2UiZwJYA9iMyboYyW9yJvAO9V753ZhS+DHKEjZRKAxPPOb7MXXu84lsPFG+vZt6FRFniZ8rXi+zCIw4yQ==}
 
   '@darkalpha/nova@0.1.6':
-    resolution: {integrity: sha512-JS1SFJFVAfpXfkomaBkrKxE4cyrd/uz5CzaqodNuZg8/Syq40SvNY+/Kqx4HR/cBECPOgPueLQdaLh75KUZ3Sw==}
+    resolution: {integrity: sha512-06dHjczf0eIOUBKBRTuq1f1syMFtITT6slbOyYrRaZspXaTjMKD0jJO7pAEWE6T8Xf1guBuKvhO7fNNFJ1RkYQ==}
     engines: {node: '>=18.18.0'}
     hasBin: true
 
