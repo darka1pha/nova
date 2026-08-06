@@ -12,8 +12,8 @@ importers:
         specifier: ^0.8.2
         version: 0.8.2
       '@darkalpha/nova':
-        specifier: ^0.1.5
-        version: 0.1.5
+        specifier: ^0.1.6
+        version: 0.1.6
       execa:
         specifier: ^9.5.1
         version: 9.6.1
@@ -67,7 +67,7 @@ packages:
   '@clack/prompts@0.8.2':
     resolution: {integrity: sha512-6b9Ab2UiZwJYA9iMyboYyW9yJvAO9V753ZhS+DHKEjZRKAxPPOb7MXXu84lsPFG+vZt6FRFniZ8rXi+zCIw4yQ==}
 
-  '@darkalpha/nova@0.1.5':
+  '@darkalpha/nova@0.1.6':
     resolution: {integrity: sha512-JS1SFJFVAfpXfkomaBkrKxE4cyrd/uz5CzaqodNuZg8/Syq40SvNY+/Kqx4HR/cBECPOgPueLQdaLh75KUZ3Sw==}
     engines: {node: '>=18.18.0'}
     hasBin: true
@@ -874,7 +874,7 @@ snapshots:
       picocolors: 1.1.1
       sisteransi: 1.0.5
 
-  '@darkalpha/nova@0.1.5':
+  '@darkalpha/nova@0.1.6':
     dependencies:
       '@clack/prompts': 0.8.2
       execa: 9.6.1
