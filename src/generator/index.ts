@@ -7,10 +7,18 @@ import { ADDON_FOLDERS } from "../addonRegistry.js";
 import { appendPluginEnvContributions } from "../plugin/applyEnv.js";
 import { writePluginDocs } from "../plugin/applyDocs.js";
 import { applyPluginPatches } from "../plugin/applyPatches.js";
+import { applyPluginTemplates } from "../plugin/applyTemplates.js";
 import { getPluginRegistry } from "../plugin/legacyAdapter.js";
+import { runPluginHook } from "../plugin/runHooks.js";
+import type { PluginRegistry } from "../plugin/registry.js";
 import type { PluginResolutionContext } from "../plugin/types.js";
+import { validatePlugins } from "../plugin/validate.js";
 import { buildGeneratorContext } from "./context.js";
-import { DirectoryNotEmptyError, InvalidProjectNameError } from "./errors.js";
+import {
+  DirectoryNotEmptyError,
+  InvalidProjectNameError,
+  PluginValidationError,
+} from "./errors.js";
 import { HookRegistry } from "./hooks.js";
 import { executePlan, rollbackTargetDir, type OperationPlan } from "./operations.js";
 import { patchAppProviders, patchMiddleware, patchNextConfig } from "./patchers/index.js";
@@ -39,10 +47,24 @@ const BASE_DIR = path.join(TEMPLATES_ROOT, "base");
 export const ADDONS_DIR = path.join(TEMPLATES_ROOT, "addons");
 const UI_DIR = path.join(TEMPLATES_ROOT, "ui");
 
+export interface GenerateProjectResult {
+  targetDir: string;
+  /**
+   * The plugin registry used for this generation run. Returned so callers
+   * (e.g. `src/index.ts`, when `installNow` is set) can invoke additional
+   * plugin lifecycle hooks - `beforeInstall`/`afterInstall` - around steps
+   * that happen outside `generateProject` itself, without having to
+   * rebuild the registry or re-derive the enabled plugin list.
+   */
+  pluginRegistry: PluginRegistry;
+  /** The resolution context every plugin contribution/hook was evaluated against. */
+  pluginContext: PluginResolutionContext;
+}
+
 export async function generateProject(
   answers: Answers,
   { onStep, dryRun = false, verbose = false }: GenerateProjectOptions = {},
-) {
+): Promise<GenerateProjectResult> {
   if (!isValidProjectName(answers.projectName)) {
     throw new InvalidProjectNameError(answers.projectName);
   }
@@ -63,7 +85,35 @@ export async function generateProject(
   // see src/generator/pluginMetadata.ts for the declared constraints.
   validatePluginSelection(answers.features);
 
+  // Build the plugin registry and resolution context up front (rather than
+  // midway through generation, as in earlier versions of this function) so
+  // both plugin self-validation and every lifecycle hook - including
+  // "beforeGenerate", fired before a single file is written - can use them.
+  const pluginRegistry = getPluginRegistry();
+  const enabledPluginIds = (Object.entries(answers.features) as [FeatureKey, boolean][])
+    .filter(([, enabled]) => enabled)
+    .map(([key]) => key);
+
+  const pluginContext: PluginResolutionContext = {
+    projectName: answers.projectName,
+    packageManager: answers.packageManager,
+    uiLibrary,
+    enabledPlugins: enabledPluginIds,
+    answers: answers.pluginAnswers ?? {},
+  };
+
+  // Plugin self-validation (Node version, OS, cross-field checks on the
+  // plugin's own prompt answers, etc. - see `PluginManifest.validate`).
+  // Runs before any file is written, same guarantee
+  // `validatePluginSelection`/`resolveDependencyGraph` already give for
+  // requires/conflicts.
+  const validationIssues = validatePlugins(enabledPluginIds, pluginRegistry, pluginContext);
+  if (validationIssues.length > 0) {
+    throw new PluginValidationError(validationIssues);
+  }
+
   await hooks.run("beforeGenerate", context);
+  await runPluginHook("beforeGenerate", enabledPluginIds, pluginRegistry, pluginContext);
 
   logger.step("Copying base template");
 
@@ -92,6 +142,8 @@ export async function generateProject(
   }
 
   try {
+    await runPluginHook("beforeRender", enabledPluginIds, pluginRegistry, pluginContext);
+
     await executePlan(plan, { dryRun, logger });
 
     for (const feature of enabledFeatures) {
@@ -100,8 +152,10 @@ export async function generateProject(
 
     if (dryRun) {
       logger.info("Dry run complete - no files were written.");
+      await runPluginHook("afterRender", enabledPluginIds, pluginRegistry, pluginContext);
       await hooks.run("afterGenerate", context);
-      return { targetDir };
+      await runPluginHook("afterGenerate", enabledPluginIds, pluginRegistry, pluginContext);
+      return { targetDir, pluginRegistry, pluginContext };
     }
 
     logger.step("Writing package.json");
@@ -114,26 +168,20 @@ export async function generateProject(
     await patchMiddleware(targetDir, answers.features);
 
     // Everything below this point drives off the Phase 2 plugin registry
-    // rather than generator-owned, per-feature arrays: patches, env vars,
-    // and docs a plugin declares on its own manifest (see src/plugin/).
-    // Plugins that haven't migrated a given contribution (most, for now)
-    // simply have an empty/undefined array here and these calls are
-    // no-ops for them.
-    const pluginRegistry = getPluginRegistry();
-    const enabledPluginIds = (Object.entries(answers.features) as [FeatureKey, boolean][])
-      .filter(([, enabled]) => enabled)
-      .map(([key]) => key);
+    // rather than generator-owned, per-feature arrays: templates, patches,
+    // env vars, and docs a plugin declares on its own manifest (see
+    // src/plugin/). Plugins that haven't migrated a given contribution
+    // (most, for now) simply have an empty/undefined array here and these
+    // calls are no-ops for them.
+    logger.step("Applying plugin-declared templates");
+    await applyPluginTemplates(targetDir, enabledPluginIds, pluginRegistry, pluginContext);
 
-    const pluginContext: PluginResolutionContext = {
-      projectName: answers.projectName,
-      packageManager: answers.packageManager,
-      uiLibrary,
-      enabledPlugins: enabledPluginIds,
-      answers: answers.pluginAnswers ?? {},
-    };
+    await runPluginHook("afterRender", enabledPluginIds, pluginRegistry, pluginContext);
 
     logger.step("Applying plugin-declared patches");
+    await runPluginHook("beforePatch", enabledPluginIds, pluginRegistry, pluginContext);
     await applyPluginPatches(targetDir, enabledPluginIds, pluginRegistry, pluginContext);
+    await runPluginHook("afterPatch", enabledPluginIds, pluginRegistry, pluginContext);
 
     logger.step("Merging plugin-declared environment variables");
     await appendPluginEnvContributions(targetDir, enabledPluginIds, pluginRegistry);
@@ -152,6 +200,8 @@ export async function generateProject(
       await writeTailwindForDaisy(targetDir);
     }
 
+    await runPluginHook("beforeComplete", enabledPluginIds, pluginRegistry, pluginContext);
+
     await patchReadme(targetDir, answers);
     await patchLintStaged(targetDir, answers.features);
 
@@ -160,6 +210,8 @@ export async function generateProject(
       logger.step("Generating docker-compose.yml");
       await generateDockerCompose(targetDir, answers.features);
     }
+
+    await runPluginHook("afterComplete", enabledPluginIds, pluginRegistry, pluginContext);
   } catch (error) {
     if (!dryRun) {
       await rollbackTargetDir(targetDir, logger).catch(() => {
@@ -170,8 +222,9 @@ export async function generateProject(
   }
 
   await hooks.run("afterGenerate", context);
+  await runPluginHook("afterGenerate", enabledPluginIds, pluginRegistry, pluginContext);
 
-  return { targetDir };
+  return { targetDir, pluginRegistry, pluginContext };
 }
 
 async function writeStorybookPreview(

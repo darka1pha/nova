@@ -56,3 +56,24 @@ export class OperationExecutionError extends NovaGeneratorError {
     this.cause = cause;
   }
 }
+
+/**
+ * Thrown when one or more enabled plugins' own `validate(ctx)` self-check
+ * returns `{ ok: false, errors: [...] }` (see `PluginValidationResult` in
+ * `src/plugin/types.ts`). Raised before any file is written - `validate()`
+ * is a plugin's chance to reject a selection based on things
+ * `requires`/`conflicts` can't express (Node version, OS, cross-field
+ * checks on its own prompt answers, etc.) - see `src/plugin/validate.ts`.
+ */
+export class PluginValidationError extends NovaGeneratorError {
+  public readonly issues: { plugin: string; errors: string[] }[];
+
+  constructor(issues: { plugin: string; errors: string[] }[]) {
+    const message = issues
+      .map((issue) => `${issue.plugin}:\n  - ${issue.errors.join("\n  - ")}`)
+      .join("\n");
+    super(`Plugin validation failed:\n${message}`);
+    this.name = "PluginValidationError";
+    this.issues = issues;
+  }
+}

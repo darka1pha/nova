@@ -10,6 +10,7 @@ import { addFeaturesToProject } from "./add.js";
 import { generateProject } from "./generator/index.js";
 import { getPluginInfo, listAllPluginInfo, summarizeFootprint } from "./generator/pluginInfo.js";
 import { resolveFeatureKey } from "./addonRegistry.js";
+import { runPluginHook } from "./plugin/runHooks.js";
 import { collectAnswers, FEATURE_OPTIONS } from "./prompts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -53,6 +54,7 @@ ${pc.bold("Options")}
 ${pc.bold("Add options")}
   --path, -p <dir>   Target an existing project directory (default: current directory)
   --force, -f        Overwrite files that already exist instead of skipping them
+  --yes, -y          Skip any selected plugin's own follow-up prompts (use its defaults)
 
 ${pc.bold("Examples")}
   nova my-app
@@ -68,12 +70,14 @@ interface ParsedAddArgs {
   features: string[];
   targetPath: string;
   force: boolean;
+  yes: boolean;
 }
 
 function parseAddArgs(args: string[]): ParsedAddArgs | { error: string } {
   const features: string[] = [];
   let targetPath = process.cwd();
   let force = false;
+  let yes = false;
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -91,6 +95,11 @@ function parseAddArgs(args: string[]): ParsedAddArgs | { error: string } {
       continue;
     }
 
+    if (arg === "--yes" || arg === "-y") {
+      yes = true;
+      continue;
+    }
+
     if (arg.startsWith("-")) {
       return { error: `Unknown option: ${arg}` };
     }
@@ -98,7 +107,7 @@ function parseAddArgs(args: string[]): ParsedAddArgs | { error: string } {
     features.push(arg);
   }
 
-  return { features, targetPath, force };
+  return { features, targetPath, force, yes };
 }
 
 async function promptForFeatures(): Promise<string[]> {
@@ -128,7 +137,7 @@ async function runAddCommand(args: string[]) {
   p.intro(pc.bgCyan(pc.black(" nova add ")));
 
   let { features } = parsed;
-  const { targetPath, force } = parsed;
+  const { targetPath, force, yes } = parsed;
 
   if (features.length === 0) {
     features = await promptForFeatures();
@@ -141,11 +150,21 @@ async function runAddCommand(args: string[]) {
   try {
     result = await addFeaturesToProject(targetPath, features, {
       force,
+      skipPrompts: yes,
       onStep: (step) => spinner.message(step),
     });
   } catch (error) {
     spinner.stop("Failed to add features", 1);
     p.log.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (result.dependencyIssues.length && result.outcomes.length === 0) {
+    spinner.stop("Failed to add features", 1);
+    for (const issue of result.dependencyIssues) {
+      p.log.error(issue);
+    }
     process.exitCode = 1;
     return;
   }
@@ -192,6 +211,30 @@ async function runAddCommand(args: string[]) {
     if (outcome.skippedScripts.length) {
       console.log(
         pc.dim(`  scripts skipped:  ${outcome.skippedScripts.join(", ")} (already defined)`),
+      );
+    }
+
+    if (outcome.patchedFiles.length) {
+      console.log(`  files patched:    ${outcome.patchedFiles.join(", ")}`);
+    }
+
+    if (outcome.addedEnvKeys.length) {
+      console.log(`  env vars added:   ${outcome.addedEnvKeys.join(", ")}`);
+    }
+
+    if (outcome.skippedEnvKeys.length) {
+      console.log(
+        pc.dim(`  env vars skipped: ${outcome.skippedEnvKeys.join(", ")} (already defined)`),
+      );
+    }
+
+    if (outcome.writtenDocs.length) {
+      console.log(`  docs written:     ${outcome.writtenDocs.join(", ")}`);
+    }
+
+    if (outcome.skippedDocs.length) {
+      console.log(
+        pc.dim(`  docs skipped:     ${outcome.skippedDocs.join(", ")} (already existed)`),
       );
     }
   }
@@ -337,7 +380,26 @@ export async function run() {
     const installSpinner = p.spinner();
     installSpinner.start(`Installing dependencies with ${answers.packageManager}`);
     try {
+      // Plugin-declared beforeInstall/afterInstall hooks bracket the actual
+      // package-manager install. These live outside generateProject()
+      // itself (installation is a CLI-level concern, driven by the
+      // "install now?" prompt), which is why generateProject() returns
+      // pluginRegistry/pluginContext - so this call site can invoke them
+      // without re-deriving the enabled plugin list or rebuilding the
+      // registry.
+      await runPluginHook(
+        "beforeInstall",
+        result.pluginContext.enabledPlugins,
+        result.pluginRegistry,
+        result.pluginContext,
+      );
       await execa(answers.packageManager, ["install"], { cwd: result.targetDir });
+      await runPluginHook(
+        "afterInstall",
+        result.pluginContext.enabledPlugins,
+        result.pluginRegistry,
+        result.pluginContext,
+      );
       installSpinner.stop("Dependencies installed");
     } catch (error) {
       installSpinner.stop("Dependency installation failed", 1);
