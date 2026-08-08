@@ -67,6 +67,7 @@ nova plugins prisma
 - [Development](#development)
 - [Testing the Generator](#testing-the-generator)
 - [Adding a New Plugin](#adding-a-new-plugin)
+- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [Changelog](#changelog)
 - [Links](#links)
@@ -201,7 +202,7 @@ Examples include:
 
 And:
 
-- Prisma
+- Prisma or Drizzle (mutually exclusive — pick one)
 - Redis
 - Strapi
 - OpenAPI
@@ -259,7 +260,7 @@ Nova provides a flexible foundation for building modern Next.js applications.
 - Type-safe API infrastructure
 - Multiple UI frameworks
 - Headless CMS integrations
-- Database integrations
+- Database integrations (Prisma or Drizzle)
 - Data fetching and state management
 - Testing tools
 - Storybook
@@ -291,7 +292,7 @@ You can configure:
 5. Dependency installation
 6. Git initialization
 
-Before any files are written, Nova validates your plugin selection against each plugin's declared constraints (requires/conflicts/supported UI libraries). If something's incompatible, you'll get a clear error instead of a partially broken project.
+Before any files are written, Nova validates your plugin selection against each plugin's declared constraints (requires/conflicts/supported UI libraries) — for example, Prisma and Drizzle cannot both be enabled, since they'd both try to own `DATABASE_URL`-backed schema and migrations. If something's incompatible, you'll get a clear error instead of a partially broken project.
 
 After generation:
 
@@ -358,12 +359,13 @@ nova search <term>
 nova my-app
 nova
 nova add prisma redis
+nova add drizzle
 nova add tanstack-query --path ./my-app
 nova plugins
-nova plugins prisma
+nova plugins drizzle
 nova init --path ./my-app
 nova doctor --path ./my-app
-nova remove prisma --path ./my-app
+nova remove drizzle --path ./my-app
 nova search database
 nova status --path ./my-app --json
 ```
@@ -428,7 +430,7 @@ nova clean --path ./my-app --dry-run --json
 
 ## Adding Features to an Existing Project (`nova add`)
 
-`nova add` copies an addon's files into a project that already exists on disk and merges its dependencies/scripts into that project's `package.json`. It's the incremental counterpart to running `nova <name>` from scratch — useful when you decide you want Prisma, Redis, Sentry, or any other plugin after the fact, without regenerating the whole app.
+`nova add` copies an addon's files into a project that already exists on disk and merges its dependencies/scripts into that project's `package.json`. It's the incremental counterpart to running `nova <name>` from scratch — useful when you decide you want Prisma, Drizzle, Redis, Sentry, or any other plugin after the fact, without regenerating the whole app.
 
 ### Usage
 
@@ -465,16 +467,18 @@ Feature names accept either the camelCase key (`tanstackQuery`) or the kebab-cas
 
 1. Reads the target's `package.json` (the directory must already be a Node/Next.js project — `nova add` never creates a project itself).
 2. Detects whether the project keeps its code under `src/` or at the project root, and copies each addon's files accordingly — any file the addon authors under `src/...` is copied without the `src/` prefix when the target project has no `src/` directory.
-3. Creates whatever intermediate folders are needed (`lib/redis`, `emails/`, `.storybook/`, etc.) — nothing needs to exist beforehand.
+3. Creates whatever intermediate folders are needed (`lib/redis`, `lib/db`, `emails/`, `.storybook/`, etc.) — nothing needs to exist beforehand.
 4. Merges the addon's `dependencies` / `devDependencies` into `package.json` (a newer pinned version wins), and adds any new `scripts` entries **without overwriting** a script you've already customized. These additions come from a single shared source (`src/featureContributions.ts`) — the exact same data full generation uses, so a feature installs identically whether you selected it up front or added it later.
 5. Skips files that already exist in the project, so re-running `nova add` is safe — pass `--force` if you deliberately want the shipped template version back.
+6. Validates the requested selection against declared plugin constraints (`requires`/`conflicts`) **before writing anything** — e.g. `nova add drizzle` fails fast with an actionable error if Prisma was already requested in the same command.
 
 Plugin lifecycle hooks and any plugin-declared templates, patches, environment variables, and documentation run as part of `nova add`. Successful additions are recorded in `.nova.json` for safe later maintenance.
 
 ### Known limitations
 
 - Switching UI libraries (`mui`, `chakra`, `ant`, ...) isn't supported via `nova add` — that requires rewriting the app's provider tree, which is only handled during initial generation.
-- Config-file wiring that the generator applies automatically at scaffold time (e.g. `output: "standalone"` in `next.config.mjs` for Docker, or wrapping `next.config.mjs`/`middleware.ts` for Sentry/PWA/Bundle Analyzer/Security Headers) is **not** re-applied by `nova add`. Files are copied and dependencies are added, but you may need to wire a couple of lines by hand — check that feature's `docs/*.md` in the generated project for the exact snippet.
+- Config-file wiring that the generator applies automatically at scaffold time (e.g. `output: "standalone"` in `next.config.mjs` for Docker, or wrapping `next.config.mjs` for Sentry/PWA/Bundle Analyzer) is **not** re-applied by `nova add`. Files are copied and dependencies are added, but you may need to wire a couple of lines into `next.config.mjs` by hand — check that feature's `docs/*.md` in the generated project for the exact snippet.
+- Conflict detection for `nova add` currently only checks the features requested **in that single command** against each other — it does not yet cross-reference plugins already installed in the target project (tracked in `.nova.json`) before writing files. Running `nova add drizzle` against a project that already has Prisma installed will not be automatically blocked; check `nova info`/`nova plugins` for existing plugins before adding a conflicting one.
 - Run your package manager's install command afterwards; `nova add` only updates `package.json`, it doesn't install anything.
 
 Full reference: `docs/nova-add-command.md` inside any generated project.
@@ -492,7 +496,7 @@ nova plugins
 Lists every available plugin with its description, any `requires`/`conflicts` constraints, which UI libraries it's restricted to (if any), and a summary of what it adds to `package.json`.
 
 ```bash
-nova plugins prisma
+nova plugins drizzle
 ```
 
 Shows the same detail for a single plugin.
@@ -571,6 +575,7 @@ The available options depend on the version of Nova you are using. Every plugin 
 ## Data and Backend
 
 - Prisma ORM
+- Drizzle ORM
 - Better Auth
 - Redis
 - Strapi CMS
@@ -618,7 +623,7 @@ The available options depend on the version of Nova you are using. Every plugin 
 
 | Category                      | Options                                                                                                                 |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Data and Backend              | Prisma ORM, Better Auth, Redis, Strapi CMS, OpenAPI typed client                                                        |
+| Data and Backend              | Prisma ORM, Drizzle ORM, Better Auth, Redis, Strapi CMS, OpenAPI typed client                                           |
 | Data Fetching and State       | TanStack Query, TanStack Table, Zustand, MSW API mocking                                                                |
 | Testing                       | Vitest, Playwright, Cypress, Storybook                                                                                  |
 | Content and Communication     | React Email, Mailpit, Tiptap rich text editor                                                                           |
@@ -628,6 +633,14 @@ The available options depend on the version of Nova you are using. Every plugin 
 Each plugin is a self-contained overlay under `templates/addons/<name>`. Enabling it copies its files on top of the base template and automatically wires in the required dependencies, scripts, and environment variables — there's no manual wiring step after generation. The same addon folders back `nova add`, so a feature behaves identically whether you selected it at scaffold time or added it later.
 
 Each plugin also carries declarative metadata (`src/generator/pluginMetadata.ts`) describing its name, description, and any `requires`/`conflicts`/`supportedUI` constraints. Nova validates your full selection against this metadata **before writing any files**, so an incompatible combination fails fast with a clear error rather than partway through generation.
+
+### Known plugin conflicts
+
+| Plugin A | Plugin B | Reason |
+| --- | --- | --- |
+| Prisma ORM (`prisma`) | Drizzle ORM (`drizzle`) | Both own `DATABASE_URL`-backed schema/migrations and would contribute colliding `db:*` scripts — pick one ORM per project. |
+
+If you need to evaluate both, generate two separate projects (or use `nova add` against two throwaway scaffolds) rather than trying to enable both in one.
 
 ---
 
@@ -792,6 +805,7 @@ src/
 │   ├── api/
 │   ├── auth/
 │   ├── prisma/
+│   ├── db/
 │   ├── validations/
 │   ├── cache/
 │   └── helpers/
@@ -833,6 +847,7 @@ src/
 │   ├── api/            # Type-safe fetch client(s) + interceptors
 │   ├── auth/            # Token rotation, session helpers
 │   ├── prisma/           # Prisma client singleton (if enabled)
+│   ├── db/                # Drizzle client + schema (if enabled instead of Prisma)
 │   ├── validations/       # Shared zod schemas
 │   ├── constants/          # App-wide constants
 │   ├── helpers/             # cn() and other small helpers
@@ -927,6 +942,23 @@ The Nova repository itself is organized as follows:
 │   │       ├── providerPatcher.ts
 │   │       ├── middlewarePatcher.ts
 │   │       └── index.ts
+│   ├── plugin/
+│   │   ├── types.ts
+│   │   ├── registry.ts
+│   │   ├── legacyAdapter.ts
+│   │   ├── dependencyGraph.ts
+│   │   ├── applyTemplates.ts
+│   │   ├── applyPatches.ts
+│   │   ├── applyEnv.ts
+│   │   ├── applyDocs.ts
+│   │   ├── runHooks.ts
+│   │   ├── validate.ts
+│   │   ├── prompts.ts
+│   │   └── nativePlugins/
+│   │       ├── prisma.ts
+│   │       ├── drizzle.ts
+│   │       ├── dockerCompose.ts
+│   │       └── securityHeaders.ts
 │   ├── addonRegistry.ts
 │   ├── featureContributions.ts
 │   ├── featurePackageAdditions.ts
@@ -958,10 +990,11 @@ The Nova repository itself is organized as follows:
 
 - **`bin/nova.js`** — the published CLI entrypoint (used by `npm start` or `npx`).
 - **`src/index.ts`** — the CLI entrypoint; dispatches between the `nova [project-name]` generation flow, `nova add <feature...>`, and `nova plugins [feature]`.
-- **`src/generator.ts`** — high-level generation orchestration: validates the plugin selection, builds an operation plan (copy base template, copy selected addons, copy UI overlay), executes it with rollback on failure, writes `package.json`, and runs the config patchers and remaining single-purpose helpers (Storybook preview, DaisyUI Tailwind patch, README, lint-staged, docker-compose).
+- **`src/generator/index.ts`** — high-level generation orchestration: validates the plugin selection, builds an operation plan (copy base template, copy selected addons, copy UI overlay), executes it with rollback on failure, writes `package.json`, and runs the config patchers and remaining single-purpose helpers (Storybook preview, DaisyUI Tailwind patch, README, lint-staged, docker-compose).
 - **`src/generator/`** — generator internals, one concern per module (see [Generator Internals](#generator-internals) below).
-- **`src/add.ts`** — the `nova add` implementation: copies addon files into an existing project (with `src/`-prefix remapping) and merges dependencies/scripts into its `package.json`.
-- **`src/addonRegistry.ts`** — single source of truth mapping each `FeatureKey` to its addon folder name, shared by `generator.ts`, `add.ts`, and `pluginInfo.ts`.
+- **`src/plugin/`** — the native plugin engine (`PluginManifest`, registry, dependency graph, template/patch/env/doc application, lifecycle hooks). New plugins with richer contributions (self-declared env vars, docs, patches, prompts) are authored here under `nativePlugins/`, e.g. `drizzle.ts`.
+- **`src/add.ts`** — the `nova add` implementation: copies addon files into an existing project (with `src/`-prefix remapping) and merges dependencies/scripts into its `package.json`, running the same plugin engine (dependency graph, validation, templates, patches, env, docs) full generation uses.
+- **`src/addonRegistry.ts`** — single source of truth mapping each `FeatureKey` to its addon folder name, shared by `generator/index.ts`, `add.ts`, and `pluginInfo.ts`.
 - **`src/featureContributions.ts`** — single source of truth for what each feature contributes to `package.json` (dependencies/devDependencies/scripts), consumed by full generation, `nova add`, and `nova plugins`.
 - **`src/featurePackageAdditions.ts`** — thin backward-compatible re-export of `featureContributions.ts` for any code still importing the old name.
 - **`src/packageMerge.ts`** — merges an addon's dependency/script additions into an existing project's `package.json` without clobbering scripts you've already customized.
@@ -992,6 +1025,7 @@ Nova's own generator (as distinct from the apps it produces) went through a Phas
 | `src/generator/hooks.ts`              | A minimal `HookRegistry` supporting `beforeGenerate` / `afterGenerate` / `beforePlugin` / `afterPlugin` lifecycle hooks, so future commands can observe generation without editing generator internals.                                                                                            |
 | `src/generator/patchers/*.ts`         | Config patching for `next.config.mjs`, the provider tree (`app-providers.tsx`), and `middleware.ts`, expressed as ordered, declarative **contribution lists** (feature flag → transform) instead of inline `if` chains in `generator.ts`.                                                          |
 | `src/generator/verifyManifestSync.ts` | Regression guard confirming `buildPackageJson()`'s output matches `featureContributions.ts` per feature — exercised by `npm run verify:manifest-sync`.                                                                                                                                             |
+| `src/plugin/*`                        | The richer, self-describing plugin engine: `PluginManifest` (`templates`/`patches`/`env`/`docs`/`prompts`/`hooks`), `PluginRegistry`, `resolveDependencyGraph()` (requires/conflicts/cycles), and applier modules invoked by both full generation and `nova add`. New plugins with non-trivial contributions (like Drizzle's `env` entry) are authored here.                                     |
 
 **Design principles carried through all of the above:**
 
@@ -1024,6 +1058,7 @@ templates/
 │
 └── addons/
     ├── prisma/
+    ├── drizzle/
     ├── redis/
     ├── strapi/
     ├── sentry/
@@ -1044,7 +1079,7 @@ The goal is to keep each plugin isolated, explicit, and easy to maintain. There 
 
 UI library overlays (`templates/ui/*`) are applied last, after all selected addons, so provider wiring (e.g. wrapping `<AppProviders>` with `<MuiProvider>` or `<ChakraAppProvider>`) is consistent regardless of which other addons were selected.
 
-The exact same `templates/addons/<name>` folders power `nova add`: when adding a feature to an existing project, Nova copies the same files, only remapping the `src/` prefix if the target project doesn't use a `src/` directory. The one thing `nova add` does **not** replay is the config-patching step (`next.config.mjs`, `middleware.ts`, provider-tree wiring) that `generateProject` performs automatically — that logic lives in `src/generator/patchers/*.ts` and isn't (yet) exposed to the incremental flow, so some plugins may need a couple of lines wired in by hand after `nova add`.
+The exact same `templates/addons/<name>` folders power `nova add`: when adding a feature to an existing project, Nova copies the same files, only remapping the `src/` prefix if the target project doesn't use a `src/` directory. The one thing `nova add` does **not** replay is the config-patching step (`next.config.mjs`, `middleware.ts`, provider-tree wiring) that `generateProject` performs automatically via `src/generator/patchers/*.ts` for legacy contributions — plugins migrated to the native `src/plugin/` engine (like Drizzle's `env` contribution, or Security Headers' `patches`) **do** replay through `nova add`, since `applyPluginPatches`/`appendPluginEnvContributions`/`writePluginDocs`/`applyPluginTemplates` are shared by both `generateProject` and `addFeaturesToProject`.
 
 ---
 
@@ -1057,11 +1092,18 @@ UI:      shadcn
 Plugins: (none)
 ```
 
-**SaaS app with a Postgres backend**
+**SaaS app with a Postgres backend (Prisma)**
 
 ```text
 UI:      shadcn
 Plugins: Prisma, Better Auth, TanStack Query, Sentry, Docker
+```
+
+**SaaS app with a Postgres backend (Drizzle)**
+
+```text
+UI:      shadcn
+Plugins: Drizzle, Better Auth, TanStack Query, Sentry, Docker
 ```
 
 **Content-driven site backed by a headless CMS**
@@ -1092,7 +1134,7 @@ Plugins: Prisma, Better Auth, TanStack Query, Cypress, Vitest, Storybook,
 ```bash
 nova my-app                     # UI: shadcn, no plugins
 cd my-app
-nova add prisma betterAuth      # add auth + DB later
+nova add drizzle betterAuth     # add DB + auth later
 nova add tanstackQuery sentry   # add data fetching + monitoring later
 ```
 
@@ -1100,7 +1142,7 @@ nova add tanstackQuery sentry   # add data fetching + monitoring later
 
 ```bash
 nova plugins prisma
-nova plugins sentry
+nova plugins drizzle
 nova add prisma sentry
 ```
 
@@ -1123,10 +1165,11 @@ docs/
 ├── deployment.md
 ├── adding-a-feature.md
 ├── nova-add-command.md
+├── drizzle.md            (if Drizzle is selected)
 └── ...
 ```
 
-Plus module-local `README.md` files inside `src/lib/api/`, `src/lib/auth/`, `src/features/auth/`, and `src/i18n/` explaining the reasoning behind non-obvious implementation choices — for example why token refresh coalesces concurrent requests, or why the root `layout.tsx` is intentionally minimal.
+Plus module-local `README.md` files inside `src/lib/api/`, `src/lib/auth/`, `src/lib/db/` (if Drizzle is selected), `src/features/auth/`, and `src/i18n/` explaining the reasoning behind non-obvious implementation choices — for example why token refresh coalesces concurrent requests, or why the root `layout.tsx` is intentionally minimal.
 
 `docs/nova-add-command.md` specifically documents the `nova add` workflow from inside a generated project — usage, options, what it does under the hood, and its known limitations — so the reasoning travels with the code even if this README changes later.
 
@@ -1137,14 +1180,14 @@ Plus module-local `README.md` files inside `src/lib/api/`, `src/lib/auth/`, `src
 Generated projects include a `.env.example` covering every variable the scaffold understands, grouped by category:
 
 - **App** — public URL/name, safe to expose via `NEXT_PUBLIC_*`
-- **Database** — `DATABASE_URL`, used by Prisma if enabled
+- **Database** — `DATABASE_URL`, used by Prisma or Drizzle, whichever is enabled
 - **Authentication** — token secrets/TTLs for the custom rotation system, or Better Auth secrets if that module is enabled
 - **External APIs** — base URL/timeout for `src/lib/api`
 - **Sentry** — DSNs and trace sample rates, when Sentry is enabled
 
 `.env` itself is never committed — only `.env.example` is tracked in generated projects. When you add a new environment variable, add it to both `.env` and `.env.example` together, and to `src/config/env.ts` if the app should fail fast at boot when it's missing.
 
-When a plugin is added later via `nova add`, remember to also copy over any new variables its `docs/*.md` mentions — `nova add` copies template files and merges `package.json`, but doesn't currently append to `.env.example` automatically.
+When a plugin is added later via `nova add`, remember to also copy over any new variables its `docs/*.md` mentions — for plugins on the native `src/plugin/` engine (e.g. Drizzle), `nova add` appends any missing keys to `.env.example` automatically via `appendPluginEnvContributions`; for legacy addons this may still require a manual copy.
 
 ---
 
@@ -1163,6 +1206,8 @@ The generated `Dockerfile` uses a multi-stage build (deps → build → runtime)
 
 Every variable in `.env.example` must be set in production — missing required variables fail fast at boot if you're using the generated `src/config/env.ts` validation.
 
+Provider-specific deployment tooling (Vercel/AWS/Cloudflare/Railway/Render config generators, `nova deploy`) is planned but not yet implemented — see [Roadmap](#roadmap).
+
 ---
 
 ## FAQ
@@ -1170,8 +1215,11 @@ Every variable in `.env.example` must be set in production — missing required 
 **Does Nova lock me into a specific backend?**
 No. The generated API layer (`src/lib/api`) is a thin, typed fetch wrapper you point at any backend via `API_BASE_URL`. Nothing in the generated code assumes a specific server framework or database.
 
+**Should I pick Prisma or Drizzle?**
+Both are optional and mutually exclusive — Nova will reject a selection with both enabled. Pick Prisma if you want Prisma Studio, its generated client, and its larger example ecosystem; pick Drizzle if you want a smaller runtime, SQL-first schema definitions, and no separate client-generation step. See `nova plugins drizzle` and `nova plugins prisma`, or each plugin's `docs/*.md` in a generated project, for the full tradeoff writeup.
+
 **Can I remove a feature after generating the project?**
-Yes. Everything Nova writes is plain, readable TypeScript/React you own outright — delete the files and the corresponding dependency entries in `package.json`. There's no hidden runtime tying the app back to the `nova` CLI package.
+Yes. Everything Nova writes is plain, readable TypeScript/React you own outright — delete the files and the corresponding dependency entries in `package.json`. There's no hidden runtime tying the app back to the `nova` CLI package. `nova remove <plugin>` automates the `package.json`/manifest side of this.
 
 **Can I add a feature I skipped, without regenerating the whole project?**
 Yes — that's exactly what `nova add <feature...>` is for. Run it from inside the project (or point it at another directory with `--path`), and it copies the addon's files and merges its dependencies/scripts into your existing `package.json`. See [Adding Features to an Existing Project](#adding-features-to-an-existing-project-nova-add).
@@ -1183,7 +1231,7 @@ Run `nova plugins <feature>`. It shows the plugin's description, any `requires`/
 No, by default it skips any file that already exists at the destination. Pass `--force` if you deliberately want the shipped template version back, overwriting your local changes.
 
 **What happens if generation fails partway through?**
-Nova rolls back: since it only ever generates into a directory it just created (or confirmed was empty), a failed generation removes that directory rather than leaving a half-built project behind.
+Nova rolls back: since it only ever generates into a directory it just created (or confirmed was empty), a failed generation removes that directory rather than leaving a half-built project behind. This is also what happens if you request an invalid combination like `prisma` + `drizzle` — the error is raised before any file is written, so nothing is left on disk.
 
 **Does Nova modify my project after generation, or phone home?**
 No. Nova runs once, at generation time (or once per `nova add` invocation), entirely locally. There's no CLI daemon, no telemetry, and no ongoing dependency on `nova`/`@darkalpha/nova` inside the generated app.
@@ -1192,7 +1240,7 @@ No. Nova runs once, at generation time (or once per `nova add` invocation), enti
 Yes — pass a project name as a CLI argument and set `CI=true` in the environment; Nova will skip the interactive "install now?" confirmation, use a quieter log level, and generate non-interactively.
 
 **Which package managers are supported?**
-pnpm, npm, yarn, and bun. Whichever you choose during setup is used consistently for the generated scripts and documented install/dev commands in the project's own `README.md`.
+pnpm, npm, yarn, and bun. Whichever you choose during setup is used consistently for the generated scripts and documented install/dev commands in the project's own `README.md` — including plugin-contributed scripts like Drizzle's `db:generate`/`db:migrate`/`db:push`/`db:studio`, which call `drizzle-kit` directly rather than assuming npm.
 
 **What if I select a UI library other than shadcn — do I still get shadcn's primitives?**
 The `templates/ui/<library>` overlay is applied after the base template and after your selected addons, wiring in that library's provider and a couple of example components. shadcn-style primitives in `src/components/ui` remain in the tree unless you remove them; feel free to delete what you don't use.
@@ -1219,8 +1267,8 @@ That means the destination file already existed. This is intentional so your cus
 **`nova add` warns "looks like a UI library, not a feature."**
 UI library switching (`mui`, `chakra`, `ant`, `mantine`, `hero`, `daisy`, `headless`) isn't supported incrementally — see [Known limitations](#adding-features-to-an-existing-project-nova-add).
 
-**Generation fails with a plugin conflict or missing-dependency error.**
-Nova validates your plugin selection against declared metadata before writing anything. Run `nova plugins <feature>` for each plugin involved to see its `requires`/`conflicts` list, then adjust your selection.
+**Generation fails with a plugin conflict or missing-dependency error (e.g. Prisma + Drizzle).**
+Nova validates your plugin selection against declared metadata before writing anything. Run `nova plugins <feature>` for each plugin involved to see its `requires`/`conflicts` list, then adjust your selection to include only one of the conflicting plugins.
 
 **TypeScript can't resolve `@nova/core` while developing Nova itself.**
 Run `npm install` at the repository root first — `@nova/core` is a real workspace package, and both the editor's TypeScript server and `tsc --noEmit` need the workspace symlink (or the `paths` mapping in `tsconfig.json`) to resolve it.
@@ -1295,6 +1343,8 @@ Test scenarios may include:
 - Health checks
 - Security headers
 - Docker Compose
+- Drizzle ORM (files, scripts, dependencies, `.nova.json` tracking)
+- The Prisma/Drizzle conflict, asserting generation fails and leaves no partial project directory on disk
 
 Run the manifest sync check:
 
@@ -1330,13 +1380,7 @@ src/types.ts
 src/addonRegistry.ts
 ```
 
-4. Register the plugin in the CLI's overlay list in:
-
-```text
-src/generator.ts
-```
-
-5. Add the plugin's dependencies and scripts **once**, in:
+4. Add the plugin's dependencies and scripts **once**, in:
 
 ```text
 src/featureContributions.ts
@@ -1344,7 +1388,7 @@ src/featureContributions.ts
 
 Both `src/packageManifest.ts` (full generation) and `nova add` read from this file automatically — there is nothing further to duplicate.
 
-6. Add descriptive metadata, and any real `requires`/`conflicts`/`supportedUI` constraints, in:
+5. Add descriptive metadata, and any real `requires`/`conflicts`/`supportedUI` constraints, in:
 
 ```text
 src/generator/pluginMetadata.ts
@@ -1352,17 +1396,25 @@ src/generator/pluginMetadata.ts
 
 This also makes the plugin show up correctly in `nova plugins`.
 
-7. If the plugin needs to patch `next.config.mjs`, the provider tree, or `middleware.ts`, add a contribution to the relevant file in:
+6. If the plugin needs richer contributions — its own `env` variables, `docs`, config `patches`, or `prompts` — author it as a native manifest in:
+
+```text
+src/plugin/nativePlugins/<plugin-name>.ts
+```
+
+and register it in `src/plugin/nativePlugins/index.ts`'s `NATIVE_PLUGINS` array (see `drizzle.ts` for a minimal example built on top of steps 2–5). Plugins that only need a file overlay + package.json contribution don't need this step — they're picked up automatically via the legacy adapter.
+
+7. If the plugin needs to patch `next.config.mjs`, the provider tree, or `middleware.ts` and hasn't migrated to a native manifest, add a contribution to the relevant file in:
 
 ```text
 src/generator/patchers/
 ```
 
-rather than adding a new `if` branch to `generator.ts`.
+rather than adding a new `if` branch to `generator/index.ts`.
 
-8. Add plugin-specific environment variables (to `.env.example` in the relevant template, and document them).
+8. Add plugin-specific environment variables (to `.env.example` in the relevant template if unconditional, or via a native manifest's `env` array if plugin-specific, and document them).
 
-9. Add documentation (a `docs/<plugin>.md` in the generated project, plus a mention in this README's plugin tables).
+9. Add documentation (a `docs/<plugin>.md` in the plugin's own addon folder, plus a mention in this README's plugin tables).
 
 10. Add smoke tests in `scripts/smoke-test.mjs`.
 
@@ -1375,6 +1427,20 @@ rather than adding a new `if` branch to `generator.ts`.
 14. Run the complete test suite (`npm run typecheck && npm run verify:manifest-sync && node scripts/smoke-test.mjs`).
 
 Because a feature's package.json contribution now lives in exactly one file (`src/featureContributions.ts`), it's no longer possible for full generation and `nova add` to silently drift apart for a given plugin — `npm run verify:manifest-sync` exists specifically to catch a regression here.
+
+---
+
+## Roadmap
+
+The following are planned but **not yet implemented** — they are not selectable today via `nova`, `nova add`, or any prompt, and no code in this repository claims otherwise:
+
+- **tRPC** — type-safe router/procedures integration with the App Router, evaluated alongside (not replacing) the existing `src/lib/api` layer.
+- **GraphQL** — a client/server integration appropriate for Next.js, with schema organization and typed codegen.
+- **Supabase** — client/server SDK integration, with explicit compatibility rules against Better Auth, Prisma, and Drizzle.
+- **React Native templates** — a mobile project template, likely requiring a `ProjectTemplate`/`ProjectType` concept distinct from the current Next.js-only generator so future non-Next.js targets don't turn the CLI into framework-specific conditionals.
+- **Cloud deployment providers** — a `deployment/<provider>` architecture (starting with a small number of providers) generating deployment configuration; not an authenticated, live "click to deploy" integration unless and until explicitly documented as such.
+
+Each will land as its own self-contained plugin (or, for React Native, a new template concept) following the same process as [Adding a New Plugin](#adding-a-new-plugin) and the Drizzle ORM plugin above, one at a time, with its own tests and documentation before the next begins.
 
 ---
 
@@ -1399,7 +1465,7 @@ When contributing a new plugin or UI integration:
 - Follow the existing architecture (see [Generator Internals](#generator-internals)).
 - Declare package.json contributions once, in `src/featureContributions.ts`.
 - Declare plugin metadata and any real constraints in `src/generator/pluginMetadata.ts`.
-- Prefer a new patcher contribution in `src/generator/patchers/` over a new `if` branch in `generator.ts`.
+- Prefer a native plugin manifest (`src/plugin/nativePlugins/`) over a new `if` branch in `generator/index.ts`.
 - Update documentation.
 - Add tests.
 - Add smoke-test coverage.

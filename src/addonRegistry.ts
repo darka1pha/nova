@@ -8,6 +8,7 @@ import type { FeatureKey } from "./types.js";
  */
 export const ADDON_FOLDERS: Record<FeatureKey, string> = {
   prisma: "prisma",
+  drizzle: "drizzle",
   betterAuth: "better-auth",
   cypress: "cypress",
   docker: "docker",

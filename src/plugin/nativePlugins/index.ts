@@ -1,4 +1,5 @@
 import { dockerComposePlugin } from "./dockerCompose.js";
+import { drizzlePlugin } from "./drizzle.js";
 import { prismaPlugin } from "./prisma.js";
 import { securityHeadersPlugin } from "./securityHeaders.js";
 import type { PluginManifest } from "../types.js";
@@ -15,6 +16,7 @@ import type { PluginManifest } from "../types.js";
  */
 export const NATIVE_PLUGINS: PluginManifest[] = [
   prismaPlugin,
+  drizzlePlugin,
   dockerComposePlugin,
   securityHeadersPlugin,
 ];

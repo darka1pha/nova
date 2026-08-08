@@ -35,6 +35,7 @@ type FeatureOption<K extends FeatureKey = FeatureKey> = K extends FeatureKey
 // feature list/hints instead of maintaining two copies.
 export const FEATURE_OPTIONS: FeatureOption[] = [
   { value: "prisma", label: "Prisma ORM", hint: "PostgreSQL-ready schema + client singleton" },
+  { value: "drizzle", label: "Drizzle ORM", hint: "Type-safe SQL ORM + migrations (conflicts with Prisma)" },
   { value: "betterAuth", label: "Better Auth", hint: "Full session/auth system" },
   { value: "tanstackQuery", label: "TanStack Query", hint: "Client-side data fetching/caching" },
   { value: "cypress", label: "Cypress", hint: "E2E testing" },
@@ -161,6 +162,7 @@ export async function collectAnswers(cliProjectName?: string): Promise<Answers> 
     initGit: Boolean(initGit),
     features: {
       prisma: featureSet.has("prisma"),
+      drizzle: featureSet.has("drizzle"),
       betterAuth: featureSet.has("betterAuth"),
       tanstackQuery: featureSet.has("tanstackQuery"),
       cypress: featureSet.has("cypress"),

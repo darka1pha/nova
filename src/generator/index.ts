@@ -393,6 +393,12 @@ async function generateDockerCompose(targetDir: string, features: FeatureFlags) 
     );
   }
 
+  if (features.drizzle) {
+    services.push(
+      `  postgres:\n    image: postgres:15\n    environment:\n      - POSTGRES_PASSWORD=postgres\n    ports:\n      - \"5432:5432\"\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n`,
+    );
+  }
+
   if (features.redis) {
     services.push(`  redis:\n    image: redis:7.2-alpine\n    ports:\n      - \"6379:6379\"\n`);
   }
@@ -403,7 +409,7 @@ async function generateDockerCompose(targetDir: string, features: FeatureFlags) 
     );
   }
 
-  const volumes = features.prisma ? `\nvolumes:\n  pgdata:` : "";
+  const volumes = features.prisma || features.drizzle ? `\nvolumes:\n  pgdata:` : "";
 
   const compose = `version: '3.8'\nservices:\n${services.join("\n")}${volumes}\n`;
 
@@ -457,6 +463,7 @@ async function patchReadme(targetDir: string, answers: Answers) {
 
   const featureLabels: Record<FeatureKey, string> = {
     prisma: "Prisma ORM",
+    drizzle: "Drizzle ORM",
     betterAuth: "Better Auth",
     tanstackQuery: "TanStack Query",
     cypress: "Cypress (E2E)",
@@ -487,6 +494,7 @@ async function patchReadme(targetDir: string, answers: Answers) {
 
   const scriptHints: Partial<Record<FeatureKey, string>> = {
     prisma: "| `db:generate` / `db:migrate` / `db:studio` / `db:seed` | Prisma |",
+    drizzle: "| `db:generate` / `db:migrate` / `db:push` / `db:studio` | Drizzle ORM |",
     cypress: "| `cy:open` / `cy:run` | Cypress |",
     vitest: "| `test` / `test:watch` | Vitest |",
     storybook: "| `storybook` / `build-storybook` | Storybook |",
