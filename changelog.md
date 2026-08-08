@@ -57,11 +57,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ---
 
-## [0.1.6] - prior release
+## [0.1.7] - prior release
 
 Baseline referenced by this changelog's `[Unreleased]` section. See git history for details predating this changelog's introduction.
 
 ---
 
 [Unreleased]: https://github.com/darka1pha/nova/compare/v0.1.6...HEAD
-[0.1.6]: https://github.com/darka1pha/nova/releases/tag/v0.1.6
+[0.1.7]: https://github.com/darka1pha/nova/releases/tag/v0.1.6
