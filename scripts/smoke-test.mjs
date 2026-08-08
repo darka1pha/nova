@@ -354,4 +354,102 @@ if (missing.length) {
   process.exit(1);
 }
 
+// Drizzle ORM plugin test
+const drizzleAnswers = {
+  ...fullAnswers,
+  projectName: "smoke-drizzle",
+  uiLibrary: "shadcn",
+  features: {
+    prisma: false,
+    betterAuth: false,
+    tanstackQuery: false,
+    cypress: false,
+    vitest: false,
+    storybook: false,
+    docker: false,
+    husky: false,
+    pwa: false,
+    bundleAnalyzer: false,
+    zustand: false,
+    msw: false,
+    reactEmail: false,
+    playwright: false,
+    sentry: false,
+    openapi: false,
+    redis: false,
+    mailpit: false,
+    dockerCompose: false,
+    health: false,
+    securityHeaders: false,
+    drizzle: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, drizzleAnswers.projectName));
+const drizzleResult = await generateProject(drizzleAnswers, { onStep: (s) => console.log("drizzle step:", s) });
+const drizzleMustExist = [
+  "drizzle.config.ts",
+  "src/lib/db/schema.ts",
+  "src/lib/db/client.ts",
+  "docs/drizzle.md",
+];
+
+missing = [];
+for (const rel of drizzleMustExist) {
+  const exists = await fs.pathExists(path.join(drizzleResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING DRIZZLE FILES:", missing);
+  process.exit(1);
+}
+
+const drizzlePkg = await fs.readJson(path.join(drizzleResult.targetDir, "package.json"));
+const drizzleScripts = ["db:generate", "db:migrate", "db:push", "db:studio"];
+const missingScripts = drizzleScripts.filter((s) => !drizzlePkg.scripts?.[s]);
+if (missingScripts.length) {
+  console.error("MISSING DRIZZLE SCRIPTS:", missingScripts);
+  process.exit(1);
+}
+if (!drizzlePkg.dependencies?.["drizzle-orm"]) {
+  console.error("MISSING drizzle-orm DEPENDENCY");
+  process.exit(1);
+}
+
+const drizzleNovaConfig = await fs.readJson(path.join(drizzleResult.targetDir, ".nova.json"));
+if (!drizzleNovaConfig.plugins.includes("drizzle")) {
+  console.error("DRIZZLE NOT TRACKED IN .nova.json", drizzleNovaConfig);
+  process.exit(1);
+}
+
+// Drizzle <-> Prisma conflict test - must fail generation before writing files
+const conflictAnswers = {
+  ...drizzleAnswers,
+  projectName: "smoke-drizzle-prisma-conflict",
+  features: {
+    ...drizzleAnswers.features,
+    prisma: true,
+    drizzle: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, conflictAnswers.projectName));
+let conflictThrew = false;
+try {
+  await generateProject(conflictAnswers, { onStep: () => {} });
+} catch (error) {
+  conflictThrew = true;
+  console.log("Expected Drizzle/Prisma conflict error:", error instanceof Error ? error.message : error);
+}
+if (!conflictThrew) {
+  console.error("EXPECTED Prisma/Drizzle conflict error, but generation succeeded");
+  process.exit(1);
+}
+const conflictDirExists = await fs.pathExists(path.join(tmpRoot, conflictAnswers.projectName));
+if (conflictDirExists) {
+  console.error("Conflict generation should not have left a project directory on disk");
+  process.exit(1);
+}
+
 console.log("SMOKE TEST OK");

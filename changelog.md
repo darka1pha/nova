@@ -10,12 +10,17 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ### Added
 
+- **Drizzle ORM plugin (`drizzle`)** — a second, mutually-exclusive database option alongside Prisma. Adds `drizzle-orm` + `postgres` (postgres-js driver) as dependencies, `drizzle-kit` + `dotenv` as devDependencies, and `db:generate`/`db:migrate`/`db:push`/`db:studio` scripts (all invoking `drizzle-kit` directly, so they work identically across npm/pnpm/yarn/bun). Generated files: `drizzle.config.ts`, `src/lib/db/schema.ts` (starter `users` table), `src/lib/db/client.ts` (singleton postgres-js client + Drizzle instance, hot-reload-safe), `src/lib/db/README.md`, and `docs/drizzle.md`. Authored as a **native plugin manifest** (`src/plugin/nativePlugins/drizzle.ts`, registered in `NATIVE_PLUGINS`) declaring a `DATABASE_URL` env contribution (deduped against the existing key already in `.env.example`) — no new conditionals were added to `src/generator/index.ts`. Supported via `nova <name>` (interactive/`--path` selection), `nova add drizzle`, `nova remove drizzle`, and `nova plugins drizzle`.
+- **Prisma/Drizzle conflict rule** — `drizzle`'s `PLUGIN_METADATA` entry declares `conflicts: ["prisma"]`, so both `validatePluginSelection` (full generation) and `resolveDependencyGraph` (`nova add`) reject a selection containing both before any file is written, with an actionable `PluginConflictError` message. A failed selection leaves no partial project directory on disk, consistent with existing rollback behavior.
+- **Smoke test coverage for Drizzle** — `scripts/smoke-test.mjs` now generates a dedicated Drizzle project and asserts the expected files, `db:*` scripts, and `drizzle-orm` dependency exist and are tracked in `.nova.json`, plus a negative test asserting the Prisma+Drizzle combination fails generation and cleans up after itself.
+- **Roadmap section in README** — documents tRPC, GraphQL, Supabase, React Native templates, and cloud deployment providers as explicitly planned-but-not-implemented, so the feature list never claims capabilities the codebase doesn't have.
+
 - **Project manifest (`.nova.json`)** — generated projects now carry a versioned Nova manifest recording selected plugins, package manager, and UI library. It is written by both `generateProject()` and `nova add`.
 - **Project maintenance commands** — added `nova init`, `nova info`, `nova status`, `nova doctor`, `nova validate`, `nova clean`, `nova diff`, `nova remove`, `nova upgrade`, and `nova repair`, all supporting `--path <dir>`.
 - **Plugin discovery and automation** — added `nova list [search-term]`, `nova list --installed`, `nova search <term>`, plus `--json` output for maintenance and discovery commands.
 - **Maintenance smoke coverage** — `scripts/smoke-test.mjs` now asserts generated `.nova.json` metadata.
 
-- **`nova plugins [feature]`** — a new CLI command to inspect plugins without reading source. With no argument, lists every plugin with its description, `requires`/`conflicts` constraints, supported UI libraries, and a summary of its `package.json` footprint. With a feature name, shows the same detail for a single plugin.
+- **`nova plugins [feature]`** — a new CLI command to inspect plugins without reading source code. With no argument, lists every plugin with its description, `requires`/`conflicts` constraints, supported UI libraries, and a summary of its `package.json` footprint. With a feature name, shows the same detail for a single plugin.
 - **`src/generator/pluginInfo.ts`** — `getPluginInfo()`, `listAllPluginInfo()`, and `summarizeFootprint()`, joining `addonRegistry.ts`, `pluginMetadata.ts`, and `featureContributions.ts` into one queryable view per plugin. Powers `nova plugins`; also intended as the foundation for future `nova doctor` / `nova upgrade` / `nova remove` commands.
 - **`src/generator/pluginMetadata.ts`** — declarative per-plugin metadata (`name`, `description`, `requires`, `conflicts`, `supportedUI`) for every `FeatureKey`.
 - **`src/generator/validators.ts`** — `validatePluginSelection()`, which checks a feature selection against `pluginMetadata.ts` **before any files are written**, throwing `MissingPluginDependencyError` or `PluginConflictError` on an invalid combination.
@@ -30,6 +35,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 - **`.github/workflows/npm-publish.yml`** — the `release` job now also runs on manual `workflow_dispatch` runs (previously it only ran on `git push` of a `v*` tag and showed as skipped on any manual dispatch). A new `Resolve release tag` step derives the release tag from `package.json`'s version on manual dispatches (since `github.ref_name` is a branch name, not a version tag, in that case), while continuing to use the pushed tag directly on tag-push runs.
 
 ### Changed
+
+- **`generateProject()` / `docker-compose.yml` generation** — `generateDockerCompose()` now also emits a `postgres` service when `drizzle` is enabled, mirroring the existing `prisma` branch, so `dockerCompose` + `drizzle` gets a working local database exactly like `dockerCompose` + `prisma` already did.
+- **README plugin tables and folder-structure docs** — updated to include Drizzle ORM alongside Prisma in the "Data and Backend" category, with a new "Known plugin conflicts" table documenting the Prisma/Drizzle relationship, and a "Roadmap" section replacing implicit "planned" claims with an explicit, honest list.
 
 - **`nova add`** now records successfully added plugins in `.nova.json` after its plugin lifecycle completes. CLI help and the README now document maintenance commands, JSON output, and project metadata.
 - **`nova upgrade`** reconciles tracked plugin package declarations without rewriting application source; **`nova repair`** fixes deterministic manifest and `.env.example` drift only.
@@ -50,18 +58,18 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ### Internal / Non-breaking
 
-- No changes to generated project output. Every refactor in this release preserves byte-identical files for every existing feature/UI-library combination, verified against `scripts/smoke-test.mjs`.
-- No changes to any existing CLI command's arguments, flags, exit codes, or observable behavior. `nova <name>`, `nova add`, `-h`/`--help`, and `-v`/`--version` all behave exactly as before; `nova plugins` is purely additive.
+- No changes to generated project output for any existing feature/UI-library combination not touching `drizzle` or `dockerCompose`. Every refactor in this release preserves byte-identical files for every existing feature/UI-library combination not covered by the additions above, verified against `scripts/smoke-test.mjs`.
+- No changes to any existing CLI command's arguments, flags, exit codes, or observable behavior. `nova <name>`, `nova add`, `-h`/`--help`, and `-v`/`--version` all behave exactly as before; `nova plugins`, `drizzle`, and the docker-compose `postgres` service for `drizzle` are purely additive.
 - `docs/migration/phase-2-core-extraction.md`-style deprecation shims (`src/utils/copyTemplate.ts`, `src/utils/pmCommands.ts`) are unaffected by this pass.
 - Removed unused local one-off scripts (`scripts/fix-client-auth.js`, `scripts/fix-client-auth.cjs`) that were never referenced by `package.json`, `tsup.config.ts`, or CI, and hard-coded an absolute Windows path — dead weight left over from a one-time local repair.
 
 ---
 
-## [0.1.7] - prior release
+## [0.1.6] - prior release
 
 Baseline referenced by this changelog's `[Unreleased]` section. See git history for details predating this changelog's introduction.
 
 ---
 
 [Unreleased]: https://github.com/darka1pha/nova/compare/v0.1.6...HEAD
-[0.1.7]: https://github.com/darka1pha/nova/releases/tag/v0.1.6
+[0.1.6]: https://github.com/darka1pha/nova/releases/tag/v0.1.6

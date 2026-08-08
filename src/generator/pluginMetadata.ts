@@ -17,15 +17,23 @@ export interface PluginMetadata {
  * generator can validate a selection before writing anything to disk,
  * instead of discovering incompatibilities mid-generation.
  *
- * Deliberately conservative for Phase 1: nothing here currently declares a
- * hard conflict or requirement, since today's plugins are all designed to
- * be independently optional (see scripts/smoke-test.mjs, which exercises
- * many combinations together). New plugins should fill these fields in as
- * real constraints are identified, and `validatePluginSelection` will start
- * enforcing them automatically.
+ * A plugin only needs to declare a `conflicts` entry on itself - both
+ * `validatePluginSelection` (full generation) and `resolveDependencyGraph`
+ * (`nova add`) check every enabled plugin's own `conflicts` list against
+ * the rest of the selection, so the relationship doesn't need to be
+ * declared symmetrically on the other plugin too (see `drizzle` below).
  */
 export const PLUGIN_METADATA: Record<FeatureKey, PluginMetadata> = {
   prisma: { name: "Prisma ORM", description: "PostgreSQL-ready schema + client singleton" },
+  drizzle: {
+    name: "Drizzle ORM",
+    description:
+      "Lightweight, type-safe SQL ORM with migrations (PostgreSQL via postgres-js by default)",
+    // Both plugins own DATABASE_URL-backed schema/migrations and would
+    // contribute colliding db:* scripts if enabled together - see
+    // templates/addons/drizzle/docs/drizzle.md for the tradeoff writeup.
+    conflicts: ["prisma"],
+  },
   betterAuth: { name: "Better Auth", description: "Full session/auth system" },
   tanstackQuery: { name: "TanStack Query", description: "Client-side data fetching/caching" },
   cypress: { name: "Cypress", description: "E2E testing" },

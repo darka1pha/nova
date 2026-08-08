@@ -32,6 +32,19 @@ export const FEATURE_CONTRIBUTIONS: Record<FeatureKey, PackageAdditions> = {
       "db:seed": "tsx prisma/seed.ts",
     },
   },
+  drizzle: {
+    // postgres-js driver is the default target - see
+    // templates/addons/drizzle/docs/drizzle.md for swapping to another
+    // driver (mysql2, better-sqlite3, etc).
+    dependencies: { "drizzle-orm": "^0.36.4", postgres: "^3.4.5" },
+    devDependencies: { "drizzle-kit": "^0.28.1", dotenv: "^16.4.5" },
+    scripts: {
+      "db:generate": "drizzle-kit generate",
+      "db:migrate": "drizzle-kit migrate",
+      "db:push": "drizzle-kit push",
+      "db:studio": "drizzle-kit studio",
+    },
+  },
   betterAuth: {
     dependencies: { "better-auth": "^1.1.7" },
   },

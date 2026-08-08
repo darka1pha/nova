@@ -4,6 +4,7 @@ import type { PluginAnswers } from "./plugin/types.js";
 
 export type FeatureKey =
   | "prisma"
+  | "drizzle"
   | "betterAuth"
   | "tanstackQuery"
   | "cypress"
