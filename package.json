@@ -23,10 +23,11 @@
     "build": "tsc -p packages/core/tsconfig.json && tsup",
     "dev": "tsx ./src/index.ts",
     "prepack": "tsc -p packages/core/tsconfig.json && tsup",
-    "prepublishOnly": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit && tsx scripts/verify-package-manifest-sync.ts && tsc -p packages/core/tsconfig.json && tsup",
+    "prepublishOnly": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit && tsx scripts/verify-package-manifest-sync.ts && bash scripts/verify-versions-sync.sh && tsc -p packages/core/tsconfig.json && tsup",
     "start": "node ./bin/nova.js",
     "typecheck": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit",
-    "verify:manifest-sync": "tsx scripts/verify-package-manifest-sync.ts"
+    "verify:manifest-sync": "tsx scripts/verify-package-manifest-sync.ts",
+    "verify:versions-sync": "bash scripts/verify-versions-sync.sh"
   },
   "keywords": [
     "nextjs",

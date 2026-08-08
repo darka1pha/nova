@@ -12,7 +12,7 @@ jq ".version = \"$NEW_VERSION\"" package.json > package.json.tmp && mv package.j
 
 # Update all workspace package.json files
 for pkg in packages/*/package.json; do
-  jq ".version = \"$NEW_VERSION\"" "$pkg" > "$pkg.tmp" && mv "$pkg.tmp" package.json
+  jq ".version = \"$NEW_VERSION\"" "$pkg" > "$pkg.tmp" && mv "$pkg.tmp" "$pkg"
 done
 
 echo "Updated all versions to $NEW_VERSION"

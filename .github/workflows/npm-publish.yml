@@ -35,9 +35,14 @@ jobs:
 
       - run: npm ci
 
+      - name: Verify workspace package versions are in sync
+        run: npm run verify:versions-sync
+
       - run: npm run lint --if-present
 
       - run: npm run typecheck
+
+      - run: npm run verify:manifest-sync
 
       - run: npm run build
 
