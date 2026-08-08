@@ -1,6 +1,6 @@
 {
   "name": "@nova/core",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "description": "Framework-agnostic shared utilities for the Nova ecosystem: filesystem/template copying, package-manager command resolution, prompt cancel-handling, and logging. Contains zero feature-specific logic — see docs/migration/phase-2-core-extraction.md. Internal workspace package only; not published to npm (bundled into the `nova` CLI at build time).",
   "type": "module",

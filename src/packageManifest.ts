@@ -111,7 +111,7 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
 
   return {
     name: projectName,
-    version: "0.1.7",
+    version: "0.1.8",
     private: true,
     scripts,
     dependencies: sortKeys(dependencies),
