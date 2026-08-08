@@ -27,7 +27,8 @@
     "start": "node ./bin/nova.js",
     "typecheck": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit",
     "verify:manifest-sync": "tsx scripts/verify-package-manifest-sync.ts",
-    "verify:versions-sync": "bash scripts/verify-versions-sync.sh"
+    "verify:versions-sync": "bash scripts/verify-versions-sync.sh",
+    "verify:not-published": "bash scripts/verify-not-published.sh"
   },
   "keywords": [
     "nextjs",

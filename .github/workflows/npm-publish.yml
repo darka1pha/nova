@@ -31,12 +31,16 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          registry-url: https://registry.npmjs.org
           cache: npm
 
       - run: npm ci
 
       - name: Verify workspace package versions are in sync
         run: npm run verify:versions-sync
+
+      - name: Verify this version hasn't already been published
+        run: npm run verify:not-published
 
       - run: npm run lint --if-present
 
