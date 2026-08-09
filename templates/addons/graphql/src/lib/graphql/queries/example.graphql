@@ -1,0 +1,21 @@
+query GetUsers {
+  users {
+    id
+    name
+    email
+    role
+  }
+}
+
+query Hello($name: String) {
+  hello(name: $name)
+}
+
+mutation CreateUser($name: String!, $email: String!, $role: String) {
+  createUser(name: $name, email: $email, role: $role) {
+    id
+    name
+    email
+    role
+  }
+}
