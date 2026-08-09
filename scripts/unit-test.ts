@@ -88,5 +88,58 @@ assert.ok(deployRegistry.has("docker"), "Deployment registry must have docker");
 assert.equal(deployRegistry.list().length, 6, "Must have 6 deployment providers");
 console.log("✓ Deployment registry checks passed");
 
+// 5. Authoritative Manifest (.nova/project.json) Tests
+import fs from "fs-extra";
+import os from "node:os";
+import path from "node:path";
+import {
+  readProjectConfig,
+  writeProjectConfig,
+  initializeProjectConfig,
+  NOVA_MANIFEST_FILE,
+  LEGACY_NOVA_CONFIG_FILE,
+} from "../src/project.js";
+
+const testTmpDir = path.join(os.tmpdir(), "nova-unit-manifest-test-" + Date.now());
+await fs.ensureDir(testTmpDir);
+
+try {
+  // Test writing and reading authoritative manifest
+  await fs.writeJson(path.join(testTmpDir, "package.json"), {
+    name: "test-manifest-app",
+    version: "1.0.0",
+    dependencies: { next: "^15.0.0", react: "^19.0.0" },
+  });
+
+  const initConfig = await initializeProjectConfig(testTmpDir, ["trpc", "drizzle"], {
+    packageManager: "pnpm",
+    uiLibrary: "shadcn",
+  });
+
+  assert.equal(initConfig.name, "test-manifest-app");
+  assert.equal(initConfig.packageManager, "pnpm");
+  assert.ok(initConfig.plugins.includes("trpc"));
+  assert.ok(initConfig.plugins.includes("drizzle"));
+
+  assert.ok(await fs.pathExists(path.join(testTmpDir, NOVA_MANIFEST_FILE)), ".nova/project.json must exist");
+  assert.ok(await fs.pathExists(path.join(testTmpDir, LEGACY_NOVA_CONFIG_FILE)), ".nova.json must exist for backward compat");
+
+  const readBack = await readProjectConfig(testTmpDir);
+  assert.ok(readBack);
+  assert.equal(readBack.name, "test-manifest-app");
+  assert.equal(readBack.version, 1);
+
+  // Test legacy fallback when only .nova.json is present
+  await fs.remove(path.join(testTmpDir, NOVA_MANIFEST_FILE));
+  const legacyRead = await readProjectConfig(testTmpDir);
+  assert.ok(legacyRead, "Must fall back to .nova.json when .nova/project.json is missing");
+  assert.equal(legacyRead.name, "test-manifest-app");
+
+  console.log("✓ Authoritative manifest & backward compatibility unit tests passed");
+} finally {
+  await fs.remove(testTmpDir).catch(() => {});
+}
+
 console.log("ALL UNIT TESTS PASSED");
+
 

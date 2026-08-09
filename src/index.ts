@@ -26,9 +26,11 @@ import {
   parseProjectCommandArgs,
   removePlugins,
   repairProject,
+  statusProject,
   upgradeProject,
   validateProject,
 } from "./commands.js";
+
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -416,7 +418,6 @@ async function runDeployCommand(args: string[]) {
 }
 
 async function runMaintenanceCommand(command: string, args: string[]) {
-
   const force = args.includes("--force") || args.includes("-f");
   const dryRun = args.includes("--dry-run");
   const json = args.includes("--json");
@@ -426,47 +427,168 @@ async function runMaintenanceCommand(command: string, args: string[]) {
   const { targetDir, rest } = parsed;
   const output = (value: unknown) => { if (json) console.log(JSON.stringify(value, null, 2)); };
 
-  if (command === "init") { const config = await initProject(targetDir); if (json) output(config); else p.log.success(`Initialized Nova metadata (${config.plugins.length} tracked plugins).`); return; }
-  if (command === "info") { const info = await infoProject(targetDir); if (json) output(info); else for (const line of info) console.log(line); return; }
+  if (command === "init") {
+    const config = await initProject(targetDir);
+    if (json) {
+      output(config);
+    } else {
+      p.log.success(`Initialized Nova project manifest at .nova/project.json (${config.plugins.length} tracked plugins).`);
+    }
+    return;
+  }
+
+  if (command === "info") {
+    const info = await infoProject(targetDir);
+    if (json) {
+      output(info);
+    } else {
+      console.log(pc.bold("\nProject Information:\n"));
+      console.log(`  ${pc.cyan("Name:")}            ${info.name} (v${info.version})`);
+      console.log(`  ${pc.cyan("Type:")}            ${info.projectType}`);
+      console.log(`  ${pc.cyan("Package Manager:")} ${info.packageManager}`);
+      console.log(`  ${pc.cyan("UI Library:")}      ${info.uiLibrary}`);
+      console.log(`  ${pc.cyan("Nova Version:")}    ${info.novaVersion}`);
+      console.log(`  ${pc.cyan("Manifest:")}        ${info.manifestLocation}`);
+      console.log(`  ${pc.cyan("Core:")}            Next.js ${info.dependencies.next ?? "-"}, React ${info.dependencies.react ?? "-"}, TypeScript ${info.dependencies.typescript ?? "-"}`);
+      console.log(`  ${pc.cyan("Structure:")}       ${info.structure.hasSrcDir ? "src/ directory" : "root directory"}, ${info.structure.hasAppRouter ? "App Router" : "Pages Router"}`);
+      console.log(`  ${pc.cyan(`Plugins (${info.plugins.length}):`)}     ${info.plugins.map((pl) => pl.name).join(", ") || "none"}`);
+      if (info.deployment.configuredProviders.length) {
+        console.log(`  ${pc.cyan("Deployment:")}      ${info.deployment.configuredProviders.join(", ")}`);
+      }
+      console.log("");
+    }
+    return;
+  }
+
   if (command === "validate") {
     const issues = await validateProject(targetDir);
     if (issues.length) throw new Error(`Validation failed:\n${issues.map((issue) => `- ${issue}`).join("\n")}`);
-    if (json) output({ valid: true, issues: [] }); else p.log.success("Project configuration is valid."); return;
-  }
-  if (command === "doctor") {
-    const result = await doctorProject(targetDir);
-    for (const warning of result.warnings) p.log.warn(warning);
-    if (result.errors.length) throw new Error(`Doctor found issues:\n${result.errors.map((issue) => `- ${issue}`).join("\n")}`);
-    if (json) output({ healthy: true, ...result }); else p.log.success("No blocking project health issues found."); return;
-  }
-  if (command === "status") {
-    const [info, health] = await Promise.all([infoProject(targetDir), doctorProject(targetDir)]);
-    if (json) { output({ info, healthy: health.errors.length === 0, ...health }); return; }
-    for (const line of info) console.log(line);
-    console.log(`Health: ${health.errors.length ? "issues found" : "healthy"}`);
-    for (const warning of health.warnings) p.log.warn(warning);
-    for (const error of health.errors) p.log.error(error);
-    if (health.errors.length) process.exitCode = 1;
+    if (json) output({ valid: true, issues: [] }); else p.log.success("All plugin constraints and dependencies are valid.");
     return;
   }
-  if (command === "clean") { const found = await cleanProject(targetDir, dryRun); if (json) output({ dryRun, paths: found }); else console.log(found.length ? `${dryRun ? "Would remove" : "Removed"}: ${found.join(", ")}` : "No generated caches found."); return; }
-  if (command === "diff") { const findings = await diffProject(targetDir); if (json) output({ drift: findings }); else console.log(findings.length ? findings.map((finding) => `- ${finding}`).join("\n") : "No baseline drift detected."); return; }
+
+  if (command === "doctor") {
+    const result = await doctorProject(targetDir);
+    if (json) {
+      output(result);
+    } else {
+      console.log(pc.bold("\nNova Doctor Diagnostics:\n"));
+      for (const check of result.checks) {
+        const symbol = check.status === "pass" ? pc.green("✓") : check.status === "warn" ? pc.yellow("▲") : pc.red("✖");
+        console.log(`  ${symbol} ${pc.dim(`[${check.category}]`)} ${check.message}`);
+      }
+      console.log("");
+      if (result.errors.length) {
+        throw new Error(`Doctor found ${result.errors.length} error(s). Please resolve them to ensure project health.`);
+      } else if (result.warnings.length) {
+        p.log.warn(`Doctor passed with ${result.warnings.length} warning(s).`);
+      } else {
+        p.log.success("All health checks passed!");
+      }
+    }
+    return;
+  }
+
+  if (command === "status") {
+    const status = await statusProject(targetDir);
+    if (json) {
+      output(status);
+    } else {
+      console.log(pc.bold("\nProject Status:\n"));
+      console.log(`  ${pc.cyan("Project:")}         ${status.name} (${status.projectType})`);
+      console.log(`  ${pc.cyan("Package Manager:")} ${status.packageManager}`);
+      console.log(`  ${pc.cyan("UI Library:")}      ${status.uiLibrary}`);
+      console.log(`  ${pc.cyan("Tracked Plugins:")} ${status.pluginsCount} (${status.plugins.join(", ") || "none"})`);
+      console.log(`  ${pc.cyan("Git:")}             ${status.hasGit ? "initialized" : "not initialized"}`);
+      console.log(`  ${pc.cyan("Environment:")}     ${status.hasEnvFile ? ".env present" : "no .env (copy from .env.example)"}`);
+      console.log(`  ${pc.cyan("Health:")}          ${status.health.isHealthy ? pc.green(`Healthy (0 errors, ${status.health.warningsCount} warnings)`) : pc.red(`Issues found (${status.health.errorsCount} errors, ${status.health.warningsCount} warnings)`)}`);
+      console.log("");
+      if (!status.health.isHealthy) process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (command === "clean") {
+    const found = await cleanProject(targetDir, dryRun);
+    if (json) {
+      output({ dryRun, paths: found });
+    } else if (found.length) {
+      p.log.success(`${dryRun ? "Would remove" : "Removed"} caches: ${found.join(", ")}`);
+    } else {
+      p.log.info("No generated caches found.");
+    }
+    return;
+  }
+
+  if (command === "diff") {
+    const findings = await diffProject(targetDir);
+    if (json) {
+      output({ drift: findings });
+    } else if (!findings.length) {
+      p.log.success("No baseline drift detected. Project configuration is in sync with Nova manifests.");
+    } else {
+      console.log(pc.bold(`\nBaseline Drift Findings (${findings.length}):\n`));
+      for (const f of findings) {
+        const icon = f.severity === "error" ? pc.red("✖") : f.severity === "warning" ? pc.yellow("▲") : pc.blue("ℹ");
+        console.log(`  ${icon} ${f.description}`);
+        console.log(`    ${pc.dim("Fix:")} ${f.remediation}`);
+      }
+      console.log("");
+    }
+    return;
+  }
+
   if (command === "remove") {
     if (!rest.length) throw new Error("Usage: nova remove <plugin...> [--path <dir>] [--force]");
     const result = await removePlugins(targetDir, rest, force);
     if (result.skipped.length) p.log.warn(`Not tracked by Nova: ${result.skipped.join(", ")}`);
     if (!result.removed.length) throw new Error("No tracked plugins were removed.");
-    if (json) output(result); else { p.log.success(`Removed plugin metadata and package entries: ${result.removed.join(", ")}`); p.log.warn("Generated source files are preserved to avoid deleting user modifications."); } return;
-  }
-  if (command === "upgrade") {
-    const updates = await upgradeProject(targetDir);
-    if (json) output({ updates }); else console.log(updates.length ? `Updated package declarations: ${updates.join(", ")}` : "Plugin package declarations are already current.");
+    if (json) {
+      output(result);
+    } else {
+      p.log.success(`Removed plugin metadata and package entries: ${result.removed.join(", ")}`);
+      p.log.warn("Generated source files are preserved to avoid deleting user modifications.");
+    }
     return;
   }
-  if (command === "repair") {
-    const repaired = await repairProject(targetDir);
-    if (json) output({ repaired }); else p.log.success(`Repaired: ${repaired.join(", ")}`); return;
+
+  if (command === "upgrade") {
+    const result = await upgradeProject(targetDir, { dryRun, plugins: rest });
+    const totalUpdates = result.updatedDependencies.length + result.updatedDevDependencies.length + result.addedScripts.length;
+    if (json) {
+      output(result);
+    } else if (!totalUpdates) {
+      p.log.success("Project dependencies and scripts are already up to date.");
+    } else {
+      const prefix = dryRun ? "[DRY RUN] Would update" : "Updated";
+      if (result.updatedDependencies.length) {
+        p.log.info(`${prefix} dependencies: ${result.updatedDependencies.map((d) => `${d.name} (${d.from ?? "missing"} -> ${d.to})`).join(", ")}`);
+      }
+      if (result.updatedDevDependencies.length) {
+        p.log.info(`${prefix} devDependencies: ${result.updatedDevDependencies.map((d) => `${d.name} (${d.from ?? "missing"} -> ${d.to})`).join(", ")}`);
+      }
+      if (result.addedScripts.length) {
+        p.log.info(`${prefix} scripts: ${result.addedScripts.map((s) => `${s.name} ("${s.command}")`).join(", ")}`);
+      }
+      if (!dryRun) p.log.success(`Upgrade completed (${totalUpdates} changes applied).`);
+    }
+    return;
   }
+
+  if (command === "repair") {
+    const result = await repairProject(targetDir);
+    if (json) {
+      output(result);
+    } else if (!result.repairedFiles.length) {
+      p.log.success("Project configuration is clean. Nothing needed repair.");
+    } else {
+      p.log.success(`Repaired files: ${result.repairedFiles.join(", ")}`);
+      if (result.restoredScripts.length) p.log.info(`Restored scripts: ${result.restoredScripts.join(", ")}`);
+      if (result.restoredEnvKeys.length) p.log.info(`Restored environment keys: ${result.restoredEnvKeys.join(", ")}`);
+    }
+    return;
+  }
+
   if (command === "list" || command === "search") {
     const query = rest.join(" ");
     if (command === "search" && !query) throw new Error("Usage: nova search <term>");
@@ -476,6 +598,7 @@ async function runMaintenanceCommand(command: string, args: string[]) {
     for (const plugin of plugins) console.log(`${plugin.key.padEnd(18)} ${plugin.metadata.name} — ${plugin.metadata.description}`);
     return;
   }
+
   throw new Error(`Unknown command: ${command}`);
 }
 
@@ -763,9 +886,11 @@ export {
   repairProject,
   runDeployCommand,
   runMobileFlow,
+  statusProject,
   upgradeProject,
   validateProject,
 };
+
 
 
 

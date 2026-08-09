@@ -3,7 +3,19 @@ import fs from "fs-extra";
 import os from "node:os";
 import path from "node:path";
 import { generateProject } from "../dist/generator.js";
-import { addFeaturesToProject, removePlugins, generateDeploymentConfig } from "../dist/index.js";
+import {
+  addFeaturesToProject,
+  removePlugins,
+  generateDeploymentConfig,
+  infoProject,
+  statusProject,
+  doctorProject,
+  diffProject,
+  repairProject,
+  upgradeProject,
+  cleanProject,
+} from "../dist/index.js";
+
 
 
 const tmpRoot = path.join(os.tmpdir(), "nova-integration-test-" + Date.now());
@@ -215,11 +227,68 @@ try {
   assert.ok(await fs.pathExists(path.join(projectDir, "railway.json")), "railway.json must exist");
   console.log("✓ Railway deployment config passed");
 
+  // Test 7: Project Lifecycle & Maintenance (info, status, doctor, diff, repair, upgrade, clean)
+  const info = await infoProject(projectDir);
+  assert.equal(info.name, "test-drizzle-app");
+  assert.equal(info.packageManager, "pnpm");
+  assert.equal(info.uiLibrary, "shadcn");
+  assert.ok(info.structure.hasSrcDir);
+  console.log("✓ nova info passed");
+
+  const status = await statusProject(projectDir);
+  assert.equal(status.name, "test-drizzle-app");
+  assert.ok(status.health);
+  console.log("✓ nova status passed");
+
+  const doctor = await doctorProject(projectDir);
+  assert.ok(doctor.checks.length > 0);
+  assert.equal(doctor.errors.length, 0, "Clean project should have 0 doctor errors");
+  console.log("✓ nova doctor passed");
+
+  // Intentionally cause configuration drift
+  await fs.remove(path.join(projectDir, ".env.example"));
+  const driftBeforeRepair = await diffProject(projectDir);
+  assert.ok(driftBeforeRepair.length > 0, "diffProject must detect missing .env.example");
+  assert.ok(driftBeforeRepair.some((d) => d.type === "missing-template-file"));
+  console.log("✓ nova diff drift detection passed");
+
+  // Run repair
+  const repair = await repairProject(projectDir);
+  assert.ok(repair.repairedFiles.includes(".env.example"), "repairProject must restore .env.example");
+  assert.ok(await fs.pathExists(path.join(projectDir, ".env.example")));
+  assert.ok(await fs.pathExists(path.join(projectDir, ".nova/project.json")), ".nova/project.json must exist");
+  console.log("✓ nova repair passed");
+
+  // Verify diff clears after repair
+  const driftAfterRepair = await diffProject(projectDir);
+  assert.equal(driftAfterRepair.filter((d) => d.type === "missing-template-file").length, 0);
+  console.log("✓ drift resolution verified");
+
+  // Test upgrade (dry-run and execution)
+  const dryUpgrade = await upgradeProject(projectDir, { dryRun: true });
+  assert.equal(dryUpgrade.dryRun, true);
+  const realUpgrade = await upgradeProject(projectDir, { dryRun: false });
+  assert.equal(realUpgrade.dryRun, false);
+  console.log("✓ nova upgrade passed");
+
+  // Test clean (create dummy cache, verify clean removes it)
+  const dummyNextCache = path.join(projectDir, ".next");
+  await fs.ensureDir(dummyNextCache);
+  const dryClean = await cleanProject(projectDir, true);
+  assert.ok(dryClean.includes(".next"));
+  assert.ok(await fs.pathExists(dummyNextCache), ".next should still exist after dry clean");
+
+  const realClean = await cleanProject(projectDir, false);
+  assert.ok(realClean.includes(".next"));
+  assert.ok(!(await fs.pathExists(dummyNextCache)), ".next should be deleted after real clean");
+  console.log("✓ nova clean passed");
+
   console.log("ALL INTEGRATION TESTS PASSED");
 } finally {
   process.chdir(os.tmpdir());
   await fs.remove(tmpRoot).catch(() => {});
 }
+
 
 
 
