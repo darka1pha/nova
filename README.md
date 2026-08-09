@@ -576,13 +576,16 @@ The available options depend on the version of Nova you are using. Every plugin 
 
 - Prisma ORM
 - Drizzle ORM
+- Supabase
 - Better Auth
 - Redis
 - Strapi CMS
 - OpenAPI typed client
 
-## Data Fetching and State
+## APIs, Data Fetching and State
 
+- tRPC (end-to-end type safety)
+- GraphQL (Yoga + Codegen + typed client)
 - TanStack Query
 - TanStack Table
 - Zustand
@@ -601,10 +604,10 @@ The available options depend on the version of Nova you are using. Every plugin 
 - Mailpit
 - Tiptap rich text editor
 
-## Infrastructure and Operations
+## Infrastructure, Deployment and Operations
 
-- Docker
-- Docker Compose
+- Docker & Docker Compose
+- Cloud Deployment (Vercel, Cloudflare, Railway, Render, AWS, Docker)
 - Husky
 - lint-staged
 - PWA
@@ -616,18 +619,18 @@ The available options depend on the version of Nova you are using. Every plugin 
 ## Design and UX
 
 - Design System
-- Animations
+- Animations (Framer Motion)
 - Recharts
 
 ### Plugin summary table
 
 | Category                      | Options                                                                                                                 |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Data and Backend              | Prisma ORM, Drizzle ORM, Better Auth, Redis, Strapi CMS, OpenAPI typed client                                           |
-| Data Fetching and State       | TanStack Query, TanStack Table, Zustand, MSW API mocking                                                                |
+| Data and Backend              | Prisma ORM, Drizzle ORM, Supabase, Better Auth, Redis, Strapi CMS, OpenAPI typed client                                  |
+| APIs, Fetching & State        | tRPC, GraphQL (Yoga), TanStack Query, TanStack Table, Zustand, MSW API mocking                                          |
 | Testing                       | Vitest, Playwright, Cypress, Storybook                                                                                  |
 | Content and Communication     | React Email, Mailpit, Tiptap rich text editor                                                                           |
-| Infrastructure and Operations | Docker, Docker Compose, Husky + lint-staged, PWA, Bundle Analyzer, Sentry, Health/readiness endpoints, Security headers |
+| Infrastructure & Deployment   | Docker, Cloud Deployment (Vercel/Cloudflare/Railway/Render/AWS), Husky + lint-staged, PWA, Bundle Analyzer, Sentry, Health |
 | Design and UX                 | Design System, Animations, Recharts                                                                                     |
 
 Each plugin is a self-contained overlay under `templates/addons/<name>`. Enabling it copies its files on top of the base template and automatically wires in the required dependencies, scripts, and environment variables — there's no manual wiring step after generation. The same addon folders back `nova add`, so a feature behaves identically whether you selected it at scaffold time or added it later.
@@ -639,6 +642,7 @@ Each plugin also carries declarative metadata (`src/generator/pluginMetadata.ts`
 | Plugin A | Plugin B | Reason |
 | --- | --- | --- |
 | Prisma ORM (`prisma`) | Drizzle ORM (`drizzle`) | Both own `DATABASE_URL`-backed schema/migrations and would contribute colliding `db:*` scripts — pick one ORM per project. |
+
 
 If you need to evaluate both, generate two separate projects (or use `nova add` against two throwaway scaffolds) rather than trying to enable both in one.
 
@@ -1193,20 +1197,34 @@ When a plugin is added later via `nova add`, remember to also copy over any new 
 
 ## Deployment
 
-**Vercel (recommended default)** — push to a connected git repository; Vercel auto-detects Next.js. Set the environment variables from `.env.example` in the Vercel project settings.
+## Deployment
 
-**Docker (if selected during generation)**
+Nova provides first-class cloud deployment support through the `nova deploy` command, generating tailored configurations, automated CI/CD workflows, Dockerfiles, and production guides:
 
 ```bash
-docker build -t app .
-docker run -p 3000:3000 --env-file .env app
+# List supported cloud providers
+nova deploy --list
+
+# Configure deployment for your target cloud provider
+nova deploy vercel
+nova deploy cloudflare
+nova deploy railway
+nova deploy render
+nova deploy aws
+nova deploy docker
 ```
 
-The generated `Dockerfile` uses a multi-stage build (deps → build → runtime) and Next.js `output: "standalone"` for a minimal production image.
+### Supported Deployment Providers
+
+- **Vercel**: Generates `vercel.json` with Edge headers and `.github/workflows/deploy-vercel.yml` for automated preview and production deployments.
+- **Cloudflare Pages & Workers**: Generates `wrangler.toml` (with `nodejs_compat`) and `.github/workflows/deploy-cloudflare.yml`.
+- **Railway**: Generates `railway.json` with Nixpacks build config, healthcheck paths, and PostgreSQL/Redis provisioning guides.
+- **Render**: Generates `render.yaml` Infrastructure-as-Code blueprints for zero-configuration web service deployment.
+- **AWS**: Generates `apprunner.yaml` and `.github/workflows/deploy-aws.yml` for automated Docker builds and Amazon ECR pushes.
+- **Docker & Self-Hosted**: Generates a production multi-stage `Dockerfile.prod`, `docker-compose.prod.yml`, and reverse proxy guides in `docs/deployment/self-hosted.md`.
 
 Every variable in `.env.example` must be set in production — missing required variables fail fast at boot if you're using the generated `src/config/env.ts` validation.
 
-Provider-specific deployment tooling (Vercel/AWS/Cloudflare/Railway/Render config generators, `nova deploy`) is planned but not yet implemented — see [Roadmap](#roadmap).
 
 ---
 
@@ -1432,15 +1450,20 @@ Because a feature's package.json contribution now lives in exactly one file (`sr
 
 ## Roadmap
 
-The following are planned but **not yet implemented** — they are not selectable today via `nova`, `nova add`, or any prompt, and no code in this repository claims otherwise:
+Recently delivered capabilities:
 
-- **tRPC** — type-safe router/procedures integration with the App Router, evaluated alongside (not replacing) the existing `src/lib/api` layer.
-- **GraphQL** — a client/server integration appropriate for Next.js, with schema organization and typed codegen.
-- **Supabase** — client/server SDK integration, with explicit compatibility rules against Better Auth, Prisma, and Drizzle.
-- **React Native templates** — a mobile project template, likely requiring a `ProjectTemplate`/`ProjectType` concept distinct from the current Next.js-only generator so future non-Next.js targets don't turn the CLI into framework-specific conditionals.
-- **Cloud deployment providers** — a `deployment/<provider>` architecture (starting with a small number of providers) generating deployment configuration; not an authenticated, live "click to deploy" integration unless and until explicitly documented as such.
+- [x] **Drizzle ORM** — SQL-first schema and migration support with postgres-js and Drizzle Kit.
+- [x] **tRPC** — End-to-end type-safe API client and App Router procedures.
+- [x] **GraphQL** — GraphQL Yoga server with typed document codegen and GraphQL client.
+- [x] **Supabase** — SSR authentication, database client, and session management.
+- [x] **React Native Templates** — Expo SDK 52 mobile app scaffolding via `nova react-native` / `--template react-native`.
+- [x] **Cloud Deployment** — Modular provider-based architecture for Vercel, Cloudflare, Railway, Render, AWS, and Docker via `nova deploy`.
 
-Each will land as its own self-contained plugin (or, for React Native, a new template concept) following the same process as [Adding a New Plugin](#adding-a-new-plugin) and the Drizzle ORM plugin above, one at a time, with its own tests and documentation before the next begins.
+Future horizons under exploration:
+- Micro-frontends and Module Federation support
+- AI / LLM starter templates with Vercel AI SDK and LangChain
+- Multi-tenant SaaS workspace abstractions
+
 
 ---
 
