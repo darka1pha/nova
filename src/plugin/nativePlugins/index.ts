@@ -2,6 +2,9 @@ import { dockerComposePlugin } from "./dockerCompose.js";
 import { drizzlePlugin } from "./drizzle.js";
 import { prismaPlugin } from "./prisma.js";
 import { securityHeadersPlugin } from "./securityHeaders.js";
+import { trpcPlugin } from "./trpc.js";
+import { graphqlPlugin } from "./graphql.js";
+import { supabasePlugin } from "./supabase.js";
 import type { PluginManifest } from "../types.js";
 
 /**
@@ -19,4 +22,9 @@ export const NATIVE_PLUGINS: PluginManifest[] = [
   drizzlePlugin,
   dockerComposePlugin,
   securityHeadersPlugin,
+  trpcPlugin,
+  graphqlPlugin,
+  supabasePlugin,
 ];
+
+
