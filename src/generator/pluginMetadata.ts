@@ -75,4 +75,18 @@ export const PLUGIN_METADATA: Record<FeatureKey, PluginMetadata> = {
     name: "Tiptap Rich Text Editor",
     description: "Professional content editor with Markdown/HTML support",
   },
+  trpc: {
+    name: "tRPC",
+    description: "End-to-end type-safe APIs for Next.js App Router",
+  },
+  graphql: {
+    name: "GraphQL",
+    description: "Production-ready GraphQL Yoga server with typed codegen and request client",
+  },
+  supabase: {
+    name: "Supabase",
+    description: "Supabase client, SSR authentication, and database integration for Next.js App Router",
+  },
 };
+
+

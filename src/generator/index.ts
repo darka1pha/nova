@@ -27,6 +27,9 @@ import { validatePluginSelection } from "./validators.js";
 import { buildPackageJson } from "../packageManifest.js";
 import { isValidProjectName } from "../prompts.js";
 import { initializeProjectConfig } from "../project.js";
+import { generateMobileProject } from "./mobile.js";
+export { generateMobileProject };
+
 import type {
   Answers,
   FeatureFlags,
@@ -34,6 +37,7 @@ import type {
   GenerateProjectOptions,
   UiLibrary,
 } from "../types.js";
+
 
 // This file lives at src/generator/index.ts in dev, but tsup's named
 // entries build it to the flat dist/generator.js (see tsup.config.ts), so
@@ -490,7 +494,11 @@ async function patchReadme(targetDir: string, answers: Answers) {
     tanstackTable: "TanStack Table (data tables)",
     recharts: "Recharts (charts & visualizations)",
     tiptap: "Tiptap rich text editor",
+    trpc: "tRPC (type-safe APIs)",
+    graphql: "GraphQL (Yoga + typed client)",
+    supabase: "Supabase (SSR client + auth + db)",
   };
+
 
   const scriptHints: Partial<Record<FeatureKey, string>> = {
     prisma: "| `db:generate` / `db:migrate` / `db:studio` / `db:seed` | Prisma |",
@@ -503,7 +511,9 @@ async function patchReadme(targetDir: string, answers: Answers) {
     reactEmail: "| `email:dev` | Preview React Email templates |",
     playwright: "| `pw:test` / `pw:ui` / `pw:install` | Playwright E2E tests |",
     openapi: "| `api:types` | Generate TypeScript types from OpenAPI |",
+    graphql: "| `codegen` | Generate TypeScript types from GraphQL schema/queries |",
   };
+
 
   const featureLines = (Object.entries(answers.features) as [FeatureKey, boolean][])
     .filter(([, enabled]) => enabled)
