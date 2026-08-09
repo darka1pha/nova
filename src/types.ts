@@ -30,7 +30,13 @@ export type FeatureKey =
   | "animations"
   | "tanstackTable"
   | "recharts"
-  | "tiptap";
+  | "tiptap"
+  | "trpc"
+  | "graphql"
+  | "supabase";
+
+
+
 
 export type FeatureFlags = Record<FeatureKey, boolean>;
 
@@ -44,13 +50,17 @@ export type UiLibrary =
   | "daisy"
   | "headless";
 
+export type ProjectType = "nextjs" | "react-native" | "expo";
+
 export interface Answers {
   projectName: string;
+  projectType?: ProjectType;
   packageManager: PackageManager;
   uiLibrary: UiLibrary;
   installNow: boolean;
   initGit: boolean;
   features: FeatureFlags;
+
   /**
    * Answers collected from each selected plugin's own `prompts` (see
    * `src/plugin/prompts.ts`), keyed by plugin id then prompt name. Empty

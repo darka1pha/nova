@@ -165,4 +165,38 @@ export const FEATURE_CONTRIBUTIONS: Record<FeatureKey, PackageAdditions> = {
       "@tiptap/extension-image": "^2.10.4",
     },
   },
+  trpc: {
+    dependencies: {
+      "@trpc/server": "^10.45.2",
+      "@trpc/client": "^10.45.2",
+      "@trpc/react-query": "^10.45.2",
+      "@tanstack/react-query": "^5.62.11",
+      superjson: "^2.2.2",
+      "client-only": "^0.0.1",
+      "server-only": "^0.0.1",
+    },
+  },
+  graphql: {
+    dependencies: {
+      graphql: "^16.10.0",
+      "graphql-yoga": "^5.10.6",
+      "graphql-request": "^7.1.2",
+    },
+    devDependencies: {
+      "@graphql-codegen/cli": "^5.0.3",
+      "@graphql-codegen/typescript": "^4.0.9",
+      "@graphql-codegen/typescript-operations": "^4.4.0",
+    },
+    scripts: {
+      codegen: "graphql-codegen --config codegen.ts",
+    },
+  },
+  supabase: {
+    dependencies: {
+      "@supabase/supabase-js": "^2.47.10",
+      "@supabase/ssr": "^0.5.2",
+    },
+  },
 };
+
+

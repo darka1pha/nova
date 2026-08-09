@@ -62,7 +62,13 @@ export const FEATURE_OPTIONS: FeatureOption[] = [
   { value: "tanstackTable", label: "TanStack Table", hint: "Advanced data tables with sorting, filtering, pagination" },
   { value: "recharts", label: "Recharts", hint: "Beautiful responsive charts and visualizations" },
   { value: "tiptap", label: "Tiptap Rich Text Editor", hint: "Professional content editor with Markdown/HTML support" },
+  { value: "trpc", label: "tRPC", hint: "End-to-end type-safe APIs for Next.js App Router" },
+  { value: "graphql", label: "GraphQL", hint: "Yoga server + typed codegen + request client" },
+  { value: "supabase", label: "Supabase", hint: "SSR auth, database, and storage integration" },
 ];
+
+
+
 
 export async function collectAnswers(cliProjectName?: string): Promise<Answers> {
   p.intro(pc.bgCyan(pc.black(" nova ")));
@@ -189,7 +195,12 @@ export async function collectAnswers(cliProjectName?: string): Promise<Answers> 
       tanstackTable: featureSet.has("tanstackTable"),
       recharts: featureSet.has("recharts"),
       tiptap: featureSet.has("tiptap"),
+      trpc: featureSet.has("trpc"),
+      graphql: featureSet.has("graphql"),
+      supabase: featureSet.has("supabase"),
     },
     pluginAnswers,
   };
 }
+
+

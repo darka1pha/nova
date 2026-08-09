@@ -1,4 +1,4 @@
-import { devCommand, installCommand } from "@nova/core";
+import { bail, devCommand, installCommand, type PackageManager } from "@nova/core";
 import * as p from "@clack/prompts";
 import { execa } from "execa";
 import fs from "node:fs";
@@ -7,11 +7,14 @@ import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 
 import { addFeaturesToProject } from "./add.js";
+import { generateDeploymentConfig, listDeploymentProviders } from "./deployment/index.js";
 import { generateProject } from "./generator/index.js";
+import { generateMobileProject } from "./generator/mobile.js";
 import { getPluginInfo, listAllPluginInfo, summarizeFootprint } from "./generator/pluginInfo.js";
 import { resolveFeatureKey } from "./addonRegistry.js";
 import { runPluginHook } from "./plugin/runHooks.js";
-import { collectAnswers, FEATURE_OPTIONS } from "./prompts.js";
+import { collectAnswers, FEATURE_OPTIONS, isValidProjectName } from "./prompts.js";
+
 import {
   cleanProject,
   diffProject,
@@ -57,7 +60,9 @@ function printHelp() {
 ${pc.bold("nova")} - scaffold a production-ready Next.js app
 
 ${pc.bold("Usage")}
-  nova [project-name] [options]
+  nova [project-name] [--template nextjs|react-native]
+  nova react-native [project-name]
+  nova deploy [provider] [--path <dir>] [--force] [--list]
   nova add <feature...> [options]
   nova plugins [feature]
   nova remove <plugin...> [--path <dir>] [--force]
@@ -67,8 +72,9 @@ ${pc.bold("Usage")}
   nova list [search-term] | nova list --installed [--path <dir>] | nova search <term>
 
 ${pc.bold("Options")}
-  -h, --help       Show this help message
-  -v, --version    Print the installed version
+  -h, --help               Show this help message
+  -v, --version            Print the installed version
+  -t, --template <name>    Scaffold template: nextjs (default) or react-native
 
 ${pc.bold("Add options")}
   --path, -p <dir>   Target an existing project directory (default: current directory)
@@ -79,7 +85,8 @@ ${pc.bold("Add options")}
 
 ${pc.bold("Examples")}
   nova my-app
-  nova
+  nova my-mobile-app --template react-native
+  nova react-native my-mobile-app
   nova add prisma redis
   nova add tanstack-query --path ./my-app
   nova plugins
@@ -88,6 +95,7 @@ ${pc.bold("Examples")}
   nova remove prisma --path ./my-app
 `);
 }
+
 
 interface ParsedAddArgs {
   features: string[];
@@ -333,7 +341,82 @@ function runPluginsCommand(args: string[]) {
   console.log(pc.dim("Use `nova add <feature...>` to add one to an existing project."));
 }
 
+async function runDeployCommand(args: string[]) {
+  const providers = listDeploymentProviders();
+
+  if (args.includes("--list") || args.includes("-l")) {
+    console.log(pc.bold("\nSupported Cloud Deployment Providers:\n"));
+    for (const p of providers) {
+      console.log(`  ${pc.cyan(p.id.padEnd(14))} ${pc.bold(p.name)} - ${p.description}`);
+    }
+    console.log("");
+    return;
+  }
+
+  let targetDir = process.cwd();
+  let force = false;
+  let providerArg: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--path" || arg === "-p") {
+      targetDir = path.resolve(process.cwd(), args[++i] || ".");
+    } else if (arg === "--force" || arg === "-f") {
+      force = true;
+    } else if (!arg.startsWith("-") && !providerArg) {
+      providerArg = arg;
+    }
+  }
+
+  let selectedProvider = providerArg;
+  if (!selectedProvider) {
+    p.intro(pc.bgCyan(pc.black(" nova deploy ")));
+    const choice = await p.select<string>({
+      message: "Which cloud deployment provider do you want to configure?",
+      options: providers.map((p) => ({
+        value: p.id,
+        label: p.name,
+        hint: p.description,
+      })),
+    });
+    bail(choice);
+    selectedProvider = choice;
+  }
+
+  const spinner = p.spinner();
+  spinner.start(`Configuring deployment for ${selectedProvider}`);
+
+  try {
+    const result = await generateDeploymentConfig(selectedProvider, {
+      targetDir,
+      force,
+    });
+
+    spinner.stop(`Configured ${result.providerName} deployment`);
+
+    p.log.success(
+      `Generated deployment files: ${result.filesWritten.join(", ") || "(none)"}`,
+    );
+
+    if (result.scriptsAdded.length) {
+      p.log.info(`Added scripts to package.json: ${result.scriptsAdded.join(", ")}`);
+    }
+
+    console.log("");
+    console.log(pc.bold("Next steps:"));
+    for (const instruction of result.instructions) {
+      console.log(`  • ${instruction}`);
+    }
+    console.log("");
+  } catch (error) {
+    spinner.stop("Deployment configuration failed", 1);
+    p.log.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
 async function runMaintenanceCommand(command: string, args: string[]) {
+
   const force = args.includes("--force") || args.includes("-f");
   const dryRun = args.includes("--dry-run");
   const json = args.includes("--json");
@@ -419,7 +502,13 @@ export async function run() {
     return;
   }
 
+  if (args[0] === "deploy" || args[0] === "deployment") {
+    await runDeployCommand(args.slice(1));
+    return;
+  }
+
   if (["init", "info", "status", "doctor", "validate", "clean", "diff", "remove", "list", "search", "upgrade", "repair"].includes(args[0] ?? "")) {
+
     try {
       await runMaintenanceCommand(args[0], args.slice(1));
     } catch (error) {
@@ -429,7 +518,25 @@ export async function run() {
     return;
   }
 
-  const firstArg = args[0];
+  if (args[0] === "react-native" || args[0] === "mobile") {
+    await runMobileFlow(args[1]);
+    return;
+  }
+
+  const templateIdx = args.findIndex((arg) => arg === "--template" || arg === "-t");
+  let selectedTemplate: string | undefined;
+  const nonTemplateArgs = [...args];
+  if (templateIdx !== -1) {
+    selectedTemplate = args[templateIdx + 1];
+    nonTemplateArgs.splice(templateIdx, 2);
+  }
+
+  if (selectedTemplate === "react-native" || selectedTemplate === "expo" || selectedTemplate === "mobile") {
+    await runMobileFlow(nonTemplateArgs[0]);
+    return;
+  }
+
+  const firstArg = nonTemplateArgs[0];
 
   if (firstArg?.startsWith("-")) {
     console.error(`Unknown option: ${firstArg}\n`);
@@ -439,6 +546,7 @@ export async function run() {
   }
 
   const cliProjectName = firstArg;
+
 
   const answers = await collectAnswers(cliProjectName);
 
@@ -517,3 +625,147 @@ export async function run() {
   console.log("");
   console.log(pc.dim("See docs/folder-structure.md to get oriented."));
 }
+
+async function runMobileFlow(cliProjectName?: string) {
+  p.intro(pc.bgCyan(pc.black(" nova mobile ")));
+
+  if (cliProjectName && !isValidProjectName(cliProjectName)) {
+    p.log.error(
+      `Invalid project name "${cliProjectName}". Use only letters, numbers, dashes, or underscores.`,
+    );
+    process.exit(1);
+  }
+
+  const projectNameInput = cliProjectName ?? (await p.text({
+    message: "What is your mobile app named?",
+    placeholder: "my-mobile-app",
+    validate: (value) => {
+      if (!value) return "Project name is required";
+      if (!isValidProjectName(value)) {
+        return "Use letters, numbers, dashes or underscores only";
+      }
+    },
+  }));
+
+  bail(projectNameInput);
+  const projectName = projectNameInput;
+
+  const packageManagerInput = await p.select<PackageManager>({
+    message: "Which package manager do you want to use?",
+    options: [
+      { value: "npm", label: "npm (recommended for Expo)" },
+      { value: "pnpm", label: "pnpm" },
+      { value: "yarn", label: "yarn" },
+      { value: "bun", label: "bun" },
+    ],
+  });
+  bail(packageManagerInput);
+  const packageManager = packageManagerInput;
+
+  let installNow = false;
+  if (!process.env.CI) {
+    const installNowInput = await p.confirm({
+      message: "Install dependencies now?",
+      initialValue: true,
+    });
+    bail(installNowInput);
+    installNow = installNowInput;
+  }
+
+  const initGitInput = await p.confirm({
+    message: "Initialize a git repository?",
+    initialValue: true,
+  });
+  bail(initGitInput);
+  const initGit = initGitInput;
+
+  const spinner = p.spinner();
+  spinner.start("Generating React Native project");
+
+  let result;
+  try {
+    result = await generateMobileProject(
+      {
+        projectName,
+        projectType: "react-native",
+        packageManager,
+        uiLibrary: "headless",
+        installNow,
+        initGit,
+        features: {} as any,
+      },
+      {
+        onStep: (step) => spinner.message(step),
+      },
+    );
+  } catch (error) {
+    spinner.stop("Generation failed", 1);
+    p.log.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+    return;
+  }
+
+  spinner.stop("Mobile project generated");
+
+  if (initGit) {
+    try {
+      await execa("git", ["init"], { cwd: result.targetDir });
+      await execa("git", ["add", "-A"], { cwd: result.targetDir });
+      await execa("git", ["commit", "-m", "chore: initial commit from nova"], {
+        cwd: result.targetDir,
+      });
+      p.log.success("Initialized git repository");
+    } catch {
+      p.log.warn("Could not initialize git automatically (is git installed?)");
+    }
+  }
+
+  if (installNow) {
+    const installSpinner = p.spinner();
+    installSpinner.start(`Installing dependencies with ${packageManager}`);
+    try {
+      await execa(packageManager, ["install"], { cwd: result.targetDir });
+      installSpinner.stop("Dependencies installed");
+    } catch (error) {
+      installSpinner.stop("Dependency installation failed", 1);
+      p.log.error(error instanceof Error ? error.message : String(error));
+      p.log.warn(`Run "${installCommand(packageManager)}" manually inside ${projectName}.`);
+    }
+  }
+
+  p.outro(pc.green("Done!"));
+
+  console.log("");
+  console.log(pc.bold("Next steps:"));
+  console.log(`  cd ${projectName}`);
+  if (!installNow) console.log(`  ${installCommand(packageManager)}`);
+  console.log(`  ${packageManager === "npm" ? "npm start" : `${packageManager} start`}`);
+  console.log("");
+  console.log(pc.dim("Press 'i' for iOS Simulator, 'a' for Android Emulator, 'w' for Web"));
+  console.log(pc.dim("See docs/mobile.md to get oriented."));
+}
+
+export {
+  addFeaturesToProject,
+  cleanProject,
+  diffProject,
+  doctorProject,
+  generateDeploymentConfig,
+  generateMobileProject,
+  generateProject,
+  infoProject,
+  initProject,
+  listAllPluginInfo,
+  listDeploymentProviders,
+  listInstalledPlugins,
+  listPlugins,
+  removePlugins,
+  repairProject,
+  runDeployCommand,
+  runMobileFlow,
+  upgradeProject,
+  validateProject,
+};
+
+
+

@@ -13,6 +13,7 @@ export interface NovaProjectConfig {
   version: 1;
   packageManager: PackageManager;
   uiLibrary: UiLibrary;
+  projectType?: "nextjs" | "react-native" | "expo";
   plugins: FeatureKey[];
 }
 
@@ -62,7 +63,7 @@ export async function writeProjectConfig(targetDir: string, config: NovaProjectC
 export async function initializeProjectConfig(
   targetDir: string,
   plugins: FeatureKey[] = [],
-  overrides: Partial<Pick<NovaProjectConfig, "packageManager" | "uiLibrary">> = {},
+  overrides: Partial<Pick<NovaProjectConfig, "packageManager" | "uiLibrary" | "projectType">> = {},
 ): Promise<NovaProjectConfig> {
   const pkg = await readProjectPackage(targetDir);
   const existing = await readProjectConfig(targetDir);
@@ -71,14 +72,17 @@ export async function initializeProjectConfig(
     version: 1,
     packageManager: overrides.packageManager ?? await detectProjectPackageManager(targetDir),
     uiLibrary: overrides.uiLibrary ?? detectProjectUiLibrary(pkg),
+    projectType: overrides.projectType ?? (pkg.dependencies && "expo" in (pkg.dependencies as Record<string, unknown>) ? "react-native" : "nextjs"),
     plugins,
   };
   if (overrides.packageManager) config.packageManager = overrides.packageManager;
   if (overrides.uiLibrary) config.uiLibrary = overrides.uiLibrary;
+  if (overrides.projectType) config.projectType = overrides.projectType;
   if (plugins.length) config.plugins = [...new Set([...config.plugins, ...plugins])];
   await writeProjectConfig(targetDir, config);
   return config;
 }
+
 
 export function resolveKnownFeatures(values: string[]): FeatureKey[] {
   return values.map(resolveFeatureKey).filter((value): value is FeatureKey => Boolean(value));
