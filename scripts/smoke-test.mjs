@@ -2,7 +2,8 @@ import fs from "fs-extra";
 import os from "node:os";
 import path from "node:path";
 
-import { generateProject } from "../dist/generator.js";
+import { generateProject, generateMobileProject } from "../dist/generator.js";
+
 
 const tmpRoot = os.tmpdir();
 process.chdir(tmpRoot);
@@ -452,4 +453,276 @@ if (conflictDirExists) {
   process.exit(1);
 }
 
+// tRPC plugin test
+const trpcAnswers = {
+  ...fullAnswers,
+  projectName: "smoke-trpc",
+  uiLibrary: "shadcn",
+  features: {
+    prisma: false,
+    betterAuth: false,
+    tanstackQuery: false,
+    cypress: false,
+    vitest: false,
+    storybook: false,
+    docker: false,
+    husky: false,
+    pwa: false,
+    bundleAnalyzer: false,
+    zustand: false,
+    msw: false,
+    reactEmail: false,
+    playwright: false,
+    sentry: false,
+    openapi: false,
+    redis: false,
+    mailpit: false,
+    dockerCompose: false,
+    health: false,
+    securityHeaders: false,
+    designSystem: false,
+    strapi: false,
+    animations: false,
+    tanstackTable: false,
+    recharts: false,
+    tiptap: false,
+    drizzle: false,
+    trpc: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, trpcAnswers.projectName));
+const trpcResult = await generateProject(trpcAnswers, { onStep: (s) => console.log("trpc step:", s) });
+const trpcMustExist = [
+  "src/lib/trpc/server.ts",
+  "src/lib/trpc/root.ts",
+  "src/lib/trpc/routers/example.ts",
+  "src/lib/trpc/client.ts",
+  "src/lib/trpc/provider.tsx",
+  "src/app/api/trpc/[trpc]/route.ts",
+  "src/components/examples/trpc-action-panel.tsx",
+  "docs/trpc.md",
+];
+
+missing = [];
+for (const rel of trpcMustExist) {
+  const exists = await fs.pathExists(path.join(trpcResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING TRPC FILES:", missing);
+  process.exit(1);
+}
+
+const trpcPkg = await fs.readJson(path.join(trpcResult.targetDir, "package.json"));
+if (!trpcPkg.dependencies?.["@trpc/server"] || !trpcPkg.dependencies?.["@trpc/client"]) {
+  console.error("MISSING tRPC DEPENDENCY");
+  process.exit(1);
+}
+
+const trpcProviders = await fs.readFile(path.join(trpcResult.targetDir, "src/providers/app-providers.tsx"), "utf8");
+if (!trpcProviders.includes("TRPCProvider")) {
+  console.error("TRPCProvider NOT PATCHED IN app-providers.tsx");
+  process.exit(1);
+}
+
+// GraphQL plugin test
+const graphqlAnswers = {
+  ...fullAnswers,
+  projectName: "smoke-graphql",
+  uiLibrary: "shadcn",
+  features: {
+    prisma: false,
+    betterAuth: false,
+    tanstackQuery: false,
+    cypress: false,
+    vitest: false,
+    storybook: false,
+    docker: false,
+    husky: false,
+    pwa: false,
+    bundleAnalyzer: false,
+    zustand: false,
+    msw: false,
+    reactEmail: false,
+    playwright: false,
+    sentry: false,
+    openapi: false,
+    redis: false,
+    mailpit: false,
+    dockerCompose: false,
+    health: false,
+    securityHeaders: false,
+    designSystem: false,
+    strapi: false,
+    animations: false,
+    tanstackTable: false,
+    recharts: false,
+    tiptap: false,
+    drizzle: false,
+    trpc: false,
+    graphql: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, graphqlAnswers.projectName));
+const graphqlResult = await generateProject(graphqlAnswers, { onStep: (s) => console.log("graphql step:", s) });
+const graphqlMustExist = [
+  "codegen.ts",
+  "src/app/api/graphql/route.ts",
+  "src/lib/graphql/schema.ts",
+  "src/lib/graphql/client.ts",
+  "src/lib/graphql/queries/example.graphql",
+  "src/components/examples/graphql-action-panel.tsx",
+  "docs/graphql.md",
+];
+
+missing = [];
+for (const rel of graphqlMustExist) {
+  const exists = await fs.pathExists(path.join(graphqlResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING GRAPHQL FILES:", missing);
+  process.exit(1);
+}
+
+const graphqlPkg = await fs.readJson(path.join(graphqlResult.targetDir, "package.json"));
+if (!graphqlPkg.dependencies?.["graphql-yoga"] || !graphqlPkg.scripts?.["codegen"]) {
+  console.error("MISSING GRAPHQL DEPENDENCY OR SCRIPT");
+  process.exit(1);
+}
+
+// Supabase plugin test
+const supabaseAnswers = {
+  ...fullAnswers,
+  projectName: "smoke-supabase",
+  uiLibrary: "shadcn",
+  features: {
+    prisma: false,
+    betterAuth: false,
+    tanstackQuery: false,
+    cypress: false,
+    vitest: false,
+    storybook: false,
+    docker: false,
+    husky: false,
+    pwa: false,
+    bundleAnalyzer: false,
+    zustand: false,
+    msw: false,
+    reactEmail: false,
+    playwright: false,
+    sentry: false,
+    openapi: false,
+    redis: false,
+    mailpit: false,
+    dockerCompose: false,
+    health: false,
+    securityHeaders: false,
+    designSystem: false,
+    strapi: false,
+    animations: false,
+    tanstackTable: false,
+    recharts: false,
+    tiptap: false,
+    drizzle: false,
+    trpc: false,
+    graphql: false,
+    supabase: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, supabaseAnswers.projectName));
+const supabaseResult = await generateProject(supabaseAnswers, { onStep: (s) => console.log("supabase step:", s) });
+const supabaseMustExist = [
+  "src/lib/supabase/client.ts",
+  "src/lib/supabase/server.ts",
+  "src/lib/supabase/middleware.ts",
+  "src/lib/supabase/types.ts",
+  "src/components/examples/supabase-auth-panel.tsx",
+  "docs/supabase.md",
+];
+
+missing = [];
+for (const rel of supabaseMustExist) {
+  const exists = await fs.pathExists(path.join(supabaseResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING SUPABASE FILES:", missing);
+  process.exit(1);
+}
+
+const supabasePkg = await fs.readJson(path.join(supabaseResult.targetDir, "package.json"));
+if (!supabasePkg.dependencies?.["@supabase/supabase-js"] || !supabasePkg.dependencies?.["@supabase/ssr"]) {
+  console.error("MISSING SUPABASE DEPENDENCY");
+  process.exit(1);
+}
+
+const supabaseEnv = await fs.readFile(path.join(supabaseResult.targetDir, ".env.example"), "utf8");
+if (!supabaseEnv.includes("NEXT_PUBLIC_SUPABASE_URL") || !supabaseEnv.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY")) {
+  console.error("SUPABASE ENV VARS NOT IN .env.example");
+  process.exit(1);
+}
+
+// React Native Mobile template test
+const mobileAnswers = {
+  projectName: "smoke-mobile",
+  projectType: "react-native",
+  packageManager: "npm",
+  uiLibrary: "headless",
+  installNow: false,
+  initGit: false,
+  features: {},
+};
+
+await fs.remove(path.join(tmpRoot, mobileAnswers.projectName));
+const mobileResult = await generateMobileProject(mobileAnswers, { onStep: (s) => console.log("mobile step:", s) });
+const mobileMustExist = [
+  "package.json",
+  "app.json",
+  "App.tsx",
+  "index.js",
+  "tsconfig.json",
+  "src/theme/colors.ts",
+  "src/theme/typography.ts",
+  "src/components/Card.tsx",
+  "src/components/Button.tsx",
+  "src/services/api.ts",
+  ".env.example",
+  ".gitignore",
+  "README.md",
+  "docs/mobile.md",
+];
+
+missing = [];
+for (const rel of mobileMustExist) {
+  const exists = await fs.pathExists(path.join(mobileResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING MOBILE FILES:", missing);
+  process.exit(1);
+}
+
+const mobilePkg = await fs.readJson(path.join(mobileResult.targetDir, "package.json"));
+if (!mobilePkg.dependencies?.["expo"] || !mobilePkg.dependencies?.["react-native"]) {
+  console.error("MISSING MOBILE DEPENDENCIES");
+  process.exit(1);
+}
+
+const mobileConfig = await fs.readJson(path.join(mobileResult.targetDir, ".nova.json"));
+if (mobileConfig.projectType !== "react-native") {
+  console.error("INVALID MOBILE PROJECT METADATA", mobileConfig);
+  process.exit(1);
+}
+
 console.log("SMOKE TEST OK");
+
+
+
