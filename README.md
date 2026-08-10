@@ -48,9 +48,13 @@ nova plugins prisma
 - [Features](#features)
 - [Creating a Project](#creating-a-project)
 - [CLI Usage](#cli-usage)
+- [Architecture Presets & Templates](#architecture-presets--templates)
+- [AI & LLM Ecosystem](#ai--llm-ecosystem)
+- [Plugin Registry & Discovery](#plugin-registry--discovery)
+- [Plugin Development SDK](#plugin-development-sdk)
+- [Environment Management (`nova env`)](#environment-management-nova-env)
 - [Project Maintenance](#project-maintenance)
 - [Adding Features to an Existing Project (`nova add`)](#adding-features-to-an-existing-project-nova-add)
-- [Inspecting Plugins (`nova plugins`)](#inspecting-plugins-nova-plugins)
 - [What's Included](#whats-included)
 - [Plugins and Add-ons](#plugins-and-add-ons)
 - [UI Frameworks](#ui-frameworks)
@@ -1568,19 +1572,22 @@ Because a feature's package.json contribution now lives in exactly one file (`sr
 
 ## Roadmap
 
-Recently delivered capabilities:
+### Recently Delivered
 
-- [x] **Drizzle ORM** — SQL-first schema and migration support with postgres-js and Drizzle Kit.
-- [x] **tRPC** — End-to-end type-safe API client and App Router procedures.
-- [x] **GraphQL** — GraphQL Yoga server with typed document codegen and GraphQL client.
-- [x] **Supabase** — SSR authentication, database client, and session management.
+- [x] **Vercel AI SDK & LLM Ecosystem** — Native plugins for Vercel AI SDK (`ai`, `openai`, `anthropic`, `ollama`), streaming route handlers, and chat UI components via `nova create --template ai` or `nova add ai`.
+- [x] **Architecture Presets & Starter Templates** — Curated presets (`fullstack`, `saas`, `ai`, `dashboard`, `api`) and templates with deterministic graph conflict resolution.
+- [x] **Plugin Development SDK & Registry Engine** — Complete toolkit for building, testing, validating, and discovering plugins (`nova plugin create/validate/test`, `nova search`).
+- [x] **Environment Management Subsystem** — Safe variable tracking, CI validation (`nova env check`), and automated `.env.example` sync (`nova env example`).
+- [x] **Drizzle ORM & Database Layer** — SQL-first schema and migration support with postgres-js, Drizzle Kit, Prisma, and Supabase.
+- [x] **tRPC & GraphQL** — End-to-end type-safe APIs with tRPC and GraphQL Yoga + typed codegen.
 - [x] **React Native Templates** — Expo SDK 52 mobile app scaffolding via `nova react-native` / `--template react-native`.
-- [x] **Cloud Deployment** — Modular provider-based architecture for Vercel, Cloudflare, Railway, Render, AWS, and Docker via `nova deploy`.
+- [x] **Cloud Deployment System** — Modular provider-based architecture for Vercel, Cloudflare, Railway, Render, AWS, and Docker via `nova deploy`.
 
-Future horizons under exploration:
-- Micro-frontends and Module Federation support
-- AI / LLM starter templates with Vercel AI SDK and LangChain
-- Multi-tenant SaaS workspace abstractions
+### Future Horizons & In Development
+
+- **Micro-frontends & Module Federation** — Webpack Module Federation (`@module-federation/nextjs-mf`) and host/remote container orchestration for enterprise multi-app architectures.
+- **LangChain & LangGraph Orchestration** — Complex agentic workflows, multi-agent systems, and LangChain integration alongside the existing Vercel AI SDK streaming stack.
+- **Multi-Tenant SaaS Workspace Abstractions** — Subdomain / tenant-based routing middleware (`org.app.com` or `/org/[tenant]`), workspace membership switching context, and tenant-isolated database schemas (RLS / schema-per-tenant).
 
 
 ---
