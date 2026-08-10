@@ -19,7 +19,7 @@ export const dockerDeploymentProvider: DeploymentProvider = {
   },
 
   async generateConfig(options: DeploymentConfigOptions): Promise<DeploymentResult> {
-    const { targetDir, force = false } = options;
+    const { targetDir, force = false, dryRun = false } = options;
     const filesWritten: string[] = [];
     const filesSkipped: string[] = [];
     const scriptsAdded: string[] = [];
@@ -63,7 +63,9 @@ CMD ["node", "server.js"]
     if (!force && (await fs.pathExists(dockerfilePath))) {
       filesSkipped.push("Dockerfile.prod");
     } else {
-      await fs.writeFile(dockerfilePath, dockerfileContent, "utf8");
+      if (!dryRun) {
+        await fs.writeFile(dockerfilePath, dockerfileContent, "utf8");
+      }
       filesWritten.push("Dockerfile.prod");
     }
 
@@ -91,13 +93,14 @@ CMD ["node", "server.js"]
     if (!force && (await fs.pathExists(composePath))) {
       filesSkipped.push("docker-compose.prod.yml");
     } else {
-      await fs.writeFile(composePath, composeContent, "utf8");
+      if (!dryRun) {
+        await fs.writeFile(composePath, composeContent, "utf8");
+      }
       filesWritten.push("docker-compose.prod.yml");
     }
 
     // 3. docs/deployment/self-hosted.md
     const docsDir = path.join(targetDir, "docs", "deployment");
-    await fs.ensureDir(docsDir);
     const docsPath = path.join(docsDir, "self-hosted.md");
 
     const docsContent = `# Self-Hosted Docker Deployment Guide
@@ -119,7 +122,10 @@ docker compose -f docker-compose.prod.yml up --build -d
     if (!force && (await fs.pathExists(docsPath))) {
       filesSkipped.push("docs/deployment/self-hosted.md");
     } else {
-      await fs.writeFile(docsPath, docsContent, "utf8");
+      if (!dryRun) {
+        await fs.ensureDir(docsDir);
+        await fs.writeFile(docsPath, docsContent, "utf8");
+      }
       filesWritten.push("docs/deployment/self-hosted.md");
     }
 
@@ -136,7 +142,9 @@ docker compose -f docker-compose.prod.yml up --build -d
         pkg.scripts["docker:prod"] = "docker compose -f docker-compose.prod.yml up -d";
         scriptsAdded.push("docker:prod");
       }
-      await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+      if (!dryRun) {
+        await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+      }
     }
 
     return {
@@ -146,6 +154,7 @@ docker compose -f docker-compose.prod.yml up --build -d
       filesWritten,
       filesSkipped,
       scriptsAdded,
+      dryRun,
       instructions: [
         "Generated Dockerfile.prod and docker-compose.prod.yml.",
         "Run `npm run docker:prod` or `docker compose -f docker-compose.prod.yml up -d` to launch.",

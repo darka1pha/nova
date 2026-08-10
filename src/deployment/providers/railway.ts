@@ -19,7 +19,7 @@ export const railwayProvider: DeploymentProvider = {
   },
 
   async generateConfig(options: DeploymentConfigOptions): Promise<DeploymentResult> {
-    const { targetDir, force = false } = options;
+    const { targetDir, force = false, dryRun = false } = options;
     const filesWritten: string[] = [];
     const filesSkipped: string[] = [];
     const scriptsAdded: string[] = [];
@@ -44,13 +44,14 @@ export const railwayProvider: DeploymentProvider = {
     if (!force && (await fs.pathExists(railwayJsonPath))) {
       filesSkipped.push("railway.json");
     } else {
-      await fs.writeJson(railwayJsonPath, railwayConfig, { spaces: 2 });
+      if (!dryRun) {
+        await fs.writeJson(railwayJsonPath, railwayConfig, { spaces: 2 });
+      }
       filesWritten.push("railway.json");
     }
 
     // 2. docs/deployment/railway.md
     const docsDir = path.join(targetDir, "docs", "deployment");
-    await fs.ensureDir(docsDir);
     const docsPath = path.join(docsDir, "railway.md");
 
     const docsContent = `# Railway Deployment Guide
@@ -75,7 +76,10 @@ railway up
     if (!force && (await fs.pathExists(docsPath))) {
       filesSkipped.push("docs/deployment/railway.md");
     } else {
-      await fs.writeFile(docsPath, docsContent, "utf8");
+      if (!dryRun) {
+        await fs.ensureDir(docsDir);
+        await fs.writeFile(docsPath, docsContent, "utf8");
+      }
       filesWritten.push("docs/deployment/railway.md");
     }
 
@@ -88,7 +92,9 @@ railway up
         pkg.scripts["deploy:railway"] = "railway up";
         scriptsAdded.push("deploy:railway");
       }
-      await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+      if (!dryRun) {
+        await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+      }
     }
 
     return {
@@ -98,6 +104,7 @@ railway up
       filesWritten,
       filesSkipped,
       scriptsAdded,
+      dryRun,
       instructions: [
         "Generated railway.json configuration file.",
         "Use `railway up` or connect your GitHub repository in the Railway dashboard.",

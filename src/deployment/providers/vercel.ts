@@ -19,7 +19,7 @@ export const vercelProvider: DeploymentProvider = {
   },
 
   async generateConfig(options: DeploymentConfigOptions): Promise<DeploymentResult> {
-    const { targetDir, force = false } = options;
+    const { targetDir, force = false, dryRun = false } = options;
     const filesWritten: string[] = [];
     const filesSkipped: string[] = [];
     const scriptsAdded: string[] = [];
@@ -49,13 +49,14 @@ export const vercelProvider: DeploymentProvider = {
     if (!force && (await fs.pathExists(vercelJsonPath))) {
       filesSkipped.push("vercel.json");
     } else {
-      await fs.writeJson(vercelJsonPath, vercelConfig, { spaces: 2 });
+      if (!dryRun) {
+        await fs.writeJson(vercelJsonPath, vercelConfig, { spaces: 2 });
+      }
       filesWritten.push("vercel.json");
     }
 
     // 2. .github/workflows/deploy-vercel.yml
     const workflowDir = path.join(targetDir, ".github", "workflows");
-    await fs.ensureDir(workflowDir);
     const workflowPath = path.join(workflowDir, "deploy-vercel.yml");
 
     const workflowContent = `name: Deploy to Vercel
@@ -99,13 +100,15 @@ jobs:
     if (!force && (await fs.pathExists(workflowPath))) {
       filesSkipped.push(".github/workflows/deploy-vercel.yml");
     } else {
-      await fs.writeFile(workflowPath, workflowContent, "utf8");
+      if (!dryRun) {
+        await fs.ensureDir(workflowDir);
+        await fs.writeFile(workflowPath, workflowContent, "utf8");
+      }
       filesWritten.push(".github/workflows/deploy-vercel.yml");
     }
 
     // 3. docs/deployment/vercel.md
     const docsDir = path.join(targetDir, "docs", "deployment");
-    await fs.ensureDir(docsDir);
     const docsPath = path.join(docsDir, "vercel.md");
 
     const docsContent = `# Vercel Deployment Guide
@@ -141,7 +144,10 @@ Ensure all required production environment variables (e.g. database connection s
     if (!force && (await fs.pathExists(docsPath))) {
       filesSkipped.push("docs/deployment/vercel.md");
     } else {
-      await fs.writeFile(docsPath, docsContent, "utf8");
+      if (!dryRun) {
+        await fs.ensureDir(docsDir);
+        await fs.writeFile(docsPath, docsContent, "utf8");
+      }
       filesWritten.push("docs/deployment/vercel.md");
     }
 
@@ -158,7 +164,9 @@ Ensure all required production environment variables (e.g. database connection s
         pkg.scripts["deploy:preview"] = "vercel";
         scriptsAdded.push("deploy:preview");
       }
-      await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+      if (!dryRun) {
+        await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+      }
     }
 
     return {
@@ -168,6 +176,7 @@ Ensure all required production environment variables (e.g. database connection s
       filesWritten,
       filesSkipped,
       scriptsAdded,
+      dryRun,
       instructions: [
         "Generated vercel.json configuration and GitHub Actions CI/CD workflow.",
         "Run `npx vercel` to link your project or push to GitHub to trigger automated deployments.",

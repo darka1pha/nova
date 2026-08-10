@@ -19,7 +19,7 @@ export const renderProvider: DeploymentProvider = {
   },
 
   async generateConfig(options: DeploymentConfigOptions): Promise<DeploymentResult> {
-    const { targetDir, force = false } = options;
+    const { targetDir, force = false, dryRun = false } = options;
     const filesWritten: string[] = [];
     const filesSkipped: string[] = [];
     const scriptsAdded: string[] = [];
@@ -44,13 +44,14 @@ export const renderProvider: DeploymentProvider = {
     if (!force && (await fs.pathExists(renderYamlPath))) {
       filesSkipped.push("render.yaml");
     } else {
-      await fs.writeFile(renderYamlPath, renderYaml, "utf8");
+      if (!dryRun) {
+        await fs.writeFile(renderYamlPath, renderYaml, "utf8");
+      }
       filesWritten.push("render.yaml");
     }
 
     // 2. docs/deployment/render.md
     const docsDir = path.join(targetDir, "docs", "deployment");
-    await fs.ensureDir(docsDir);
     const docsPath = path.join(docsDir, "render.md");
 
     const docsContent = `# Render Deployment Guide
@@ -71,7 +72,10 @@ Configure sensitive variables (database credentials, auth secrets) in the Render
     if (!force && (await fs.pathExists(docsPath))) {
       filesSkipped.push("docs/deployment/render.md");
     } else {
-      await fs.writeFile(docsPath, docsContent, "utf8");
+      if (!dryRun) {
+        await fs.ensureDir(docsDir);
+        await fs.writeFile(docsPath, docsContent, "utf8");
+      }
       filesWritten.push("docs/deployment/render.md");
     }
 
@@ -82,6 +86,7 @@ Configure sensitive variables (database credentials, auth secrets) in the Render
       filesWritten,
       filesSkipped,
       scriptsAdded,
+      dryRun,
       instructions: [
         "Generated render.yaml Infrastructure-as-Code blueprint.",
         "Link your GitHub repo in Render to deploy automatically.",

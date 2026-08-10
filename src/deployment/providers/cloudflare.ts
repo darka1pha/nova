@@ -19,7 +19,7 @@ export const cloudflareProvider: DeploymentProvider = {
   },
 
   async generateConfig(options: DeploymentConfigOptions): Promise<DeploymentResult> {
-    const { targetDir, force = false } = options;
+    const { targetDir, force = false, dryRun = false } = options;
     const filesWritten: string[] = [];
     const filesSkipped: string[] = [];
     const scriptsAdded: string[] = [];
@@ -38,13 +38,14 @@ NODE_VERSION = "20"
     if (!force && (await fs.pathExists(wranglerPath))) {
       filesSkipped.push("wrangler.toml");
     } else {
-      await fs.writeFile(wranglerPath, wranglerContent, "utf8");
+      if (!dryRun) {
+        await fs.writeFile(wranglerPath, wranglerContent, "utf8");
+      }
       filesWritten.push("wrangler.toml");
     }
 
     // 2. .github/workflows/deploy-cloudflare.yml
     const workflowDir = path.join(targetDir, ".github", "workflows");
-    await fs.ensureDir(workflowDir);
     const workflowPath = path.join(workflowDir, "deploy-cloudflare.yml");
 
     const workflowContent = `name: Deploy to Cloudflare Pages
@@ -72,7 +73,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js
+      - name: Build Next.js app
         run: npm run build
 
       - name: Publish to Cloudflare Pages
@@ -86,20 +87,22 @@ jobs:
     if (!force && (await fs.pathExists(workflowPath))) {
       filesSkipped.push(".github/workflows/deploy-cloudflare.yml");
     } else {
-      await fs.writeFile(workflowPath, workflowContent, "utf8");
+      if (!dryRun) {
+        await fs.ensureDir(workflowDir);
+        await fs.writeFile(workflowPath, workflowContent, "utf8");
+      }
       filesWritten.push(".github/workflows/deploy-cloudflare.yml");
     }
 
     // 3. docs/deployment/cloudflare.md
     const docsDir = path.join(targetDir, "docs", "deployment");
-    await fs.ensureDir(docsDir);
     const docsPath = path.join(docsDir, "cloudflare.md");
 
     const docsContent = `# Cloudflare Pages Deployment Guide
 
-This project is configured for edge deployments with **Cloudflare Pages**.
+This project is configured for **Cloudflare Pages**.
 
-## 1. Quick Deploy via Wrangler
+## 1. Quick Deploy via Wrangler CLI
 
 \`\`\`bash
 npm i -g wrangler
@@ -108,19 +111,20 @@ npm run build
 wrangler pages deploy .next --project-name=nova-app
 \`\`\`
 
-## 2. GitHub Actions CI/CD Setup
+## 2. Automated GitHub Actions CI/CD
 
-1. In your Cloudflare Dashboard, create an API Token with **Cloudflare Pages (Edit)** permissions.
-2. Note your **Account ID** from the Cloudflare Dashboard URL or Overview page.
-3. In your GitHub repository settings, add:
-   - \`CLOUDFLARE_API_TOKEN\`
-   - \`CLOUDFLARE_ACCOUNT_ID\`
+Add secrets in your GitHub repository:
+- \`CLOUDFLARE_API_TOKEN\`
+- \`CLOUDFLARE_ACCOUNT_ID\`
 `;
 
     if (!force && (await fs.pathExists(docsPath))) {
       filesSkipped.push("docs/deployment/cloudflare.md");
     } else {
-      await fs.writeFile(docsPath, docsContent, "utf8");
+      if (!dryRun) {
+        await fs.ensureDir(docsDir);
+        await fs.writeFile(docsPath, docsContent, "utf8");
+      }
       filesWritten.push("docs/deployment/cloudflare.md");
     }
 
@@ -133,7 +137,9 @@ wrangler pages deploy .next --project-name=nova-app
         pkg.scripts["deploy:cloudflare"] = "wrangler pages deploy .next";
         scriptsAdded.push("deploy:cloudflare");
       }
-      await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+      if (!dryRun) {
+        await fs.writeJson(pkgPath, pkg, { spaces: 2 });
+      }
     }
 
     return {

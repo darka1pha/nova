@@ -10,6 +10,7 @@ export interface DeploymentConfigOptions {
   targetDir: string;
   projectName?: string;
   force?: boolean;
+  dryRun?: boolean;
 }
 
 export interface DeploymentResult {
@@ -20,6 +21,7 @@ export interface DeploymentResult {
   filesSkipped: string[];
   scriptsAdded: string[];
   instructions: string[];
+  dryRun?: boolean;
 }
 
 export interface DeploymentProvider {
