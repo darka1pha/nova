@@ -26,6 +26,10 @@
     "prepublishOnly": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit && tsx scripts/verify-package-manifest-sync.ts && bash scripts/verify-versions-sync.sh && tsc -p packages/core/tsconfig.json && tsup",
     "start": "node ./bin/nova.js",
     "typecheck": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit",
+    "test": "tsx scripts/unit-test.ts && node scripts/integration-test.mjs && node scripts/smoke-test.mjs",
+    "test:unit": "tsx scripts/unit-test.ts",
+    "test:integration": "node scripts/integration-test.mjs",
+    "test:smoke": "node scripts/smoke-test.mjs",
     "verify:manifest-sync": "tsx scripts/verify-package-manifest-sync.ts",
     "verify:versions-sync": "bash scripts/verify-versions-sync.sh",
     "verify:not-published": "bash scripts/verify-not-published.sh"
