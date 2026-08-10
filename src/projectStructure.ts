@@ -59,6 +59,8 @@ export interface CopyAddonOptions {
   hasSrcDir: boolean;
   /** Overwrite files that already exist in the target project. Default: false. */
   force?: boolean;
+  /** When true, calculates written/skipped paths without copying files to disk. */
+  dryRun?: boolean;
 }
 
 export interface CopyAddonResult {
@@ -97,8 +99,10 @@ export async function copyAddonWithRemap(
       continue;
     }
 
-    await fs.ensureDir(path.dirname(destAbsolute));
-    await fs.copy(srcAbsolute, destAbsolute, { overwrite: true });
+    if (!options.dryRun) {
+      await fs.ensureDir(path.dirname(destAbsolute));
+      await fs.copy(srcAbsolute, destAbsolute, { overwrite: true });
+    }
     written.push(destRel);
   }
 

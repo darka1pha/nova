@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 
-import { listAllPluginInfo } from "./generator/pluginInfo.js";
+import { getPluginInfo, listAllPluginInfo } from "./generator/pluginInfo.js";
 import { getPluginRegistry } from "./plugin/legacyAdapter.js";
 import { validatePlugins } from "./plugin/validate.js";
 import {
@@ -15,12 +15,15 @@ import {
   type NovaProjectConfig,
 } from "./project.js";
 import type { FeatureKey, PackageManager, UiLibrary } from "./types.js";
+import { getPackageManagerVersion, LOCKFILES } from "./utils/packageManager.js";
+import { ProjectTransaction } from "./utils/transaction.js";
 
 export interface ProjectCommandArgs {
   targetDir: string;
   force: boolean;
   dryRun: boolean;
   json: boolean;
+  fix: boolean;
   installedOnly: boolean;
   rest: string[];
 }
@@ -30,6 +33,7 @@ export function parseProjectCommandArgs(args: string[]): ProjectCommandArgs | { 
   let force = false;
   let dryRun = false;
   let json = false;
+  let fix = false;
   let installedOnly = false;
   const rest: string[] = [];
 
@@ -44,6 +48,8 @@ export function parseProjectCommandArgs(args: string[]): ProjectCommandArgs | { 
       dryRun = true;
     } else if (arg === "--json") {
       json = true;
+    } else if (arg === "--fix") {
+      fix = true;
     } else if (arg === "--installed") {
       installedOnly = true;
     } else if (arg.startsWith("-")) {
@@ -53,7 +59,7 @@ export function parseProjectCommandArgs(args: string[]): ProjectCommandArgs | { 
     }
   }
 
-  return { targetDir, force, dryRun, json, installedOnly, rest };
+  return { targetDir, force, dryRun, json, fix, installedOnly, rest };
 }
 
 async function getProject(targetDir: string): Promise<{ pkg: Record<string, unknown>; config: NovaProjectConfig }> {
@@ -62,7 +68,25 @@ async function getProject(targetDir: string): Promise<{ pkg: Record<string, unkn
   return { pkg, config };
 }
 
-export async function initProject(targetDir: string): Promise<NovaProjectConfig> {
+export async function initProject(targetDir: string, dryRun = false): Promise<NovaProjectConfig> {
+  if (dryRun) {
+    const pkg = await readProjectPackage(targetDir);
+    const existing = await readProjectConfig(targetDir);
+    return existing ?? {
+      $schema: "https://nova.dev/schema/project.json",
+      version: 1,
+      schemaVersion: 1,
+      name: String(pkg.name ?? path.basename(targetDir)),
+      novaVersion: getNovaCliVersion(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      packageManager: "npm",
+      uiLibrary: "shadcn",
+      projectType: "nextjs",
+      plugins: [],
+      pluginVersions: {},
+    };
+  }
   return initializeProjectConfig(targetDir);
 }
 
@@ -72,11 +96,21 @@ export interface ProjectStatus {
   projectType: string;
   packageManager: PackageManager;
   uiLibrary: UiLibrary;
+  template?: string;
+  preset?: string;
   novaVersion: string;
+  schemaVersion: number;
   createdAt: string;
   updatedAt: string;
   pluginsCount: number;
   plugins: FeatureKey[];
+  architecture: {
+    database: string;
+    auth: string;
+    api: string;
+    testing: string;
+    ai: string;
+  };
   hasGit: boolean;
   hasSrcDir: boolean;
   hasEnvFile: boolean;
@@ -96,17 +130,72 @@ export async function statusProject(targetDir: string): Promise<ProjectStatus> {
   const hasEnvFile = await fs.pathExists(path.join(targetDir, ".env"));
   const hasEnvExample = await fs.pathExists(path.join(targetDir, ".env.example"));
 
+  const plugins = config.plugins;
+
+  // Determine architectural layers
+  const database = plugins.includes("drizzle")
+    ? "Drizzle ORM"
+    : plugins.includes("prisma")
+    ? "Prisma ORM"
+    : plugins.includes("supabase")
+    ? "Supabase"
+    : "None";
+
+  const auth = plugins.includes("betterAuth")
+    ? "Better Auth"
+    : plugins.includes("supabase")
+    ? "Supabase Auth"
+    : "None";
+
+  const api = plugins.includes("trpc")
+    ? "tRPC"
+    : plugins.includes("graphql")
+    ? "GraphQL Yoga"
+    : plugins.includes("openapi")
+    ? "OpenAPI"
+    : "Next.js App Router";
+
+  const testing = plugins.includes("vitest") && plugins.includes("playwright")
+    ? "Vitest + Playwright"
+    : plugins.includes("vitest")
+    ? "Vitest"
+    : plugins.includes("playwright")
+    ? "Playwright"
+    : plugins.includes("cypress")
+    ? "Cypress"
+    : "None";
+
+  const ai = plugins.includes("ai")
+    ? plugins.includes("openai")
+      ? "Vercel AI SDK (OpenAI)"
+      : plugins.includes("anthropic")
+      ? "Vercel AI SDK (Anthropic)"
+      : plugins.includes("ollama")
+      ? "Vercel AI SDK (Ollama)"
+      : "Vercel AI SDK"
+    : "None";
+
   return {
     name: String(pkg.name ?? path.basename(targetDir)),
     version: String(pkg.version ?? "1.0.0"),
     projectType: config.projectType ?? "nextjs",
     packageManager: config.packageManager,
     uiLibrary: config.uiLibrary,
+    template: config.template,
+    preset: config.preset,
     novaVersion: config.novaVersion ?? getNovaCliVersion(),
+    schemaVersion: config.schemaVersion ?? 1,
     createdAt: config.createdAt ?? "unknown",
     updatedAt: config.updatedAt ?? "unknown",
     pluginsCount: config.plugins.length,
     plugins: config.plugins,
+    architecture: {
+      database,
+      auth,
+      api,
+      testing,
+      ai,
+    },
     hasGit,
     hasSrcDir,
     hasEnvFile,
@@ -127,6 +216,7 @@ export interface DetailedProjectInfo {
   packageManager: PackageManager;
   uiLibrary: UiLibrary;
   novaVersion: string;
+  schemaVersion: number;
   manifestLocation: string;
   createdAt: string;
   updatedAt: string;
@@ -143,7 +233,9 @@ export interface DetailedProjectInfo {
   plugins: Array<{
     id: FeatureKey;
     name: string;
+    version?: string;
     category?: string;
+    capabilities?: string[];
     description: string;
     dependencies: string[];
     scripts: string[];
@@ -182,7 +274,9 @@ export async function infoProject(targetDir: string): Promise<DetailedProjectInf
     return {
       id,
       name: manifest?.name ?? String(id),
+      version: config.pluginVersions?.[id] ?? manifest?.version ?? "1.0.0",
       category: manifest?.category,
+      capabilities: manifest?.capabilities,
       description: manifest?.description ?? "",
       dependencies: Object.keys(manifest?.dependencies ?? {}),
       scripts: Object.keys(manifest?.scripts ?? {}),
@@ -198,6 +292,7 @@ export async function infoProject(targetDir: string): Promise<DetailedProjectInf
     packageManager: config.packageManager,
     uiLibrary: config.uiLibrary,
     novaVersion: config.novaVersion ?? getNovaCliVersion(),
+    schemaVersion: config.schemaVersion ?? 1,
     manifestLocation: path.join(NOVA_DIR, "project.json"),
     createdAt: config.createdAt ?? "unknown",
     updatedAt: config.updatedAt ?? "unknown",
@@ -262,23 +357,24 @@ export async function doctorProject(targetDir: string): Promise<DoctorResult> {
     if (status === "warn") warnings.push(message);
   };
 
-  // 1. Node.js runtime check
+  // 1. Environment: Node.js runtime & Package Manager
   const requiredNode = 18;
   const major = Number(process.versions.node.split(".")[0]);
   if (major < requiredNode) {
     addCheck("Environment", "error", `Node.js >= ${requiredNode} is required; currently running on ${process.versions.node}.`);
   } else {
-    addCheck("Environment", "pass", `Node.js runtime version ${process.versions.node} satisfies requirement (>= 18.0.0).`);
+    addCheck("Environment", "pass", `Node.js runtime ${process.versions.node} on ${process.platform} satisfies requirement (>= 18.0.0).`);
+  }
+
+  const pmVersion = await getPackageManagerVersion(config.packageManager);
+  if (pmVersion) {
+    addCheck("Environment", "pass", `Configured package manager "${config.packageManager}" is installed (v${pmVersion}).`);
+  } else {
+    addCheck("Environment", "warn", `Package manager binary "${config.packageManager}" was not found in PATH.`);
   }
 
   // 2. Lockfile alignment check
-  const lockfileMap: Record<PackageManager, string> = {
-    npm: "package-lock.json",
-    pnpm: "pnpm-lock.yaml",
-    yarn: "yarn.lock",
-    bun: "bun.lockb",
-  };
-  const expectedLock = lockfileMap[config.packageManager];
+  const expectedLock = LOCKFILES[config.packageManager];
   const expectedLockExists = await fs.pathExists(path.join(targetDir, expectedLock));
 
   if (!expectedLockExists) {
@@ -288,7 +384,7 @@ export async function doctorProject(targetDir: string): Promise<DoctorResult> {
   }
 
   // Check for multiple conflicting lockfiles
-  const allLocks = Object.values(lockfileMap);
+  const allLocks = Object.values(LOCKFILES);
   const foundLocks = [];
   for (const l of allLocks) {
     if (await fs.pathExists(path.join(targetDir, l))) foundLocks.push(l);
@@ -297,7 +393,14 @@ export async function doctorProject(targetDir: string): Promise<DoctorResult> {
     addCheck("Lockfile", "warn", `Multiple lockfiles detected (${foundLocks.join(", ")}). Consider removing unused lockfiles to prevent dependency resolution conflicts.`);
   }
 
-  // 3. Core dependencies check
+  // 3. Project & Manifest State
+  if (config.schemaVersion === undefined || config.schemaVersion < 1) {
+    addCheck("Configuration", "warn", "Manifest schema is outdated. Run \"nova repair\" to upgrade to schemaVersion 1.");
+  } else {
+    addCheck("Configuration", "pass", `Project manifest .nova/project.json is valid (schemaVersion: ${config.schemaVersion}).`);
+  }
+
+  // 4. Core dependencies check
   const deps = {
     ...((pkg.dependencies as Record<string, string>) ?? {}),
     ...((pkg.devDependencies as Record<string, string>) ?? {}),
@@ -324,7 +427,7 @@ export async function doctorProject(targetDir: string): Promise<DoctorResult> {
     addCheck("Dependencies", "pass", `TypeScript is present (${deps["typescript"]}).`);
   }
 
-  // 4. Configuration files
+  // 5. Configuration files
   if (!(await fs.pathExists(path.join(targetDir, "tsconfig.json")))) {
     addCheck("Configuration", "warn", "Missing tsconfig.json configuration file.");
   } else {
@@ -337,7 +440,7 @@ export async function doctorProject(targetDir: string): Promise<DoctorResult> {
     addCheck("Configuration", "pass", ".env.example is present.");
   }
 
-  // 5. Environment Variables Diagnostics
+  // 6. Environment Variables Diagnostics (Audit keys without leaking secret values)
   const envFilePath = path.join(targetDir, ".env");
   const envFileExists = await fs.pathExists(envFilePath);
   if (!envFileExists) {
@@ -345,20 +448,19 @@ export async function doctorProject(targetDir: string): Promise<DoctorResult> {
   } else {
     addCheck("Environment Variables", "pass", "Local .env file exists.");
 
-    // Check required plugin env variables
     const envContent = await fs.readFile(envFilePath, "utf8");
     const registry = getPluginRegistry();
     for (const pluginId of config.plugins) {
       const pluginManifest = registry.getPlugin(pluginId);
       for (const envDecl of pluginManifest?.env ?? []) {
         if (envDecl.required && !envContent.includes(envDecl.key)) {
-          addCheck("Environment Variables", "warn", `Plugin "${pluginManifest?.name || pluginId}" requires environment variable "${envDecl.key}", but it was not found in .env.`);
+          addCheck("Environment Variables", "warn", `Plugin "${pluginManifest?.name || pluginId}" requires environment variable "${envDecl.key}", but it was not declared in .env.`);
         }
       }
     }
   }
 
-  // 6. Plugin validation & constraints
+  // 7. Plugin validation & constraints
   const validationErrors = await validateProject(targetDir);
   if (validationErrors.length > 0) {
     for (const err of validationErrors) {
@@ -386,13 +488,15 @@ export async function doctorProject(targetDir: string): Promise<DoctorResult> {
 }
 
 export interface DriftFinding {
-  type: "missing-dependency" | "missing-dev-dependency" | "missing-script" | "missing-template-file" | "missing-env-key" | "unregistered-plugin";
+  type: "missing-dependency" | "missing-dev-dependency" | "missing-script" | "missing-template-file" | "missing-env-key" | "unregistered-plugin" | "version-drift";
   severity: "error" | "warning" | "info";
+  classification: "SAFE TO REPAIR" | "MANUAL REVIEW REQUIRED" | "INFORMATIONAL";
+  plugin?: string;
   description: string;
   remediation: string;
 }
 
-export async function diffProject(targetDir: string): Promise<DriftFinding[]> {
+export async function diffProject(targetDir: string, pluginFilter?: string): Promise<DriftFinding[]> {
   const { pkg, config } = await getProject(targetDir);
   const findings: DriftFinding[] = [];
   const registry = getPluginRegistry();
@@ -400,20 +504,26 @@ export async function diffProject(targetDir: string): Promise<DriftFinding[]> {
   const devDeps = (pkg.devDependencies as Record<string, string>) ?? {};
   const scripts = (pkg.scripts as Record<string, string>) ?? {};
 
-  // 1. Check unregistered or deprecated plugins in manifest
-  for (const plugin of config.plugins) {
+  const targetPlugins = pluginFilter
+    ? config.plugins.filter((p) => p === pluginFilter || p.toLowerCase() === pluginFilter.toLowerCase())
+    : config.plugins;
+
+  // 1. Check unregistered plugins in manifest
+  for (const plugin of targetPlugins) {
     if (!registry.has(plugin)) {
       findings.push({
         type: "unregistered-plugin",
         severity: "warning",
+        classification: "INFORMATIONAL",
+        plugin,
         description: `Plugin "${plugin}" is listed in project manifest but is not registered in Nova registry.`,
-        remediation: `Remove "${plugin}" with "nova remove ${plugin}" or update Nova.`,
+        remediation: `Remove "${plugin}" with "nova remove ${plugin}" or update Nova CLI.`,
       });
     }
   }
 
-  // 2. Check plugin-declared dependencies and scripts
-  for (const pluginId of config.plugins) {
+  // 2. Check plugin-declared dependencies, devDependencies, and scripts
+  for (const pluginId of targetPlugins) {
     const plugin = registry.getPlugin(pluginId);
     if (!plugin) continue;
 
@@ -422,6 +532,8 @@ export async function diffProject(targetDir: string): Promise<DriftFinding[]> {
         findings.push({
           type: "missing-dependency",
           severity: "error",
+          classification: "SAFE TO REPAIR",
+          plugin: pluginId,
           description: `Plugin "${plugin.name}" requires dependency "${depName}" (${version}), but it is missing from package.json.`,
           remediation: `Run "nova upgrade" or "${config.packageManager} add ${depName}".`,
         });
@@ -433,6 +545,8 @@ export async function diffProject(targetDir: string): Promise<DriftFinding[]> {
         findings.push({
           type: "missing-dev-dependency",
           severity: "error",
+          classification: "SAFE TO REPAIR",
+          plugin: pluginId,
           description: `Plugin "${plugin.name}" requires devDependency "${devDepName}" (${version}), but it is missing from package.json.`,
           remediation: `Run "nova upgrade" or "${config.packageManager} add -D ${devDepName}".`,
         });
@@ -444,34 +558,41 @@ export async function diffProject(targetDir: string): Promise<DriftFinding[]> {
         findings.push({
           type: "missing-script",
           severity: "warning",
+          classification: "SAFE TO REPAIR",
+          plugin: pluginId,
           description: `Plugin "${plugin.name}" declares script "${scriptName}" ("${scriptCmd}"), but it is missing from package.json.`,
-          remediation: `Run "nova repair" to restore missing plugin scripts.`,
+          remediation: 'Run "nova repair" to restore missing plugin scripts.',
         });
       }
     }
   }
 
   // 3. Baseline files check
-  if (!(await fs.pathExists(path.join(targetDir, ".env.example")))) {
-    findings.push({
-      type: "missing-template-file",
-      severity: "warning",
-      description: "Missing template baseline file: .env.example",
-      remediation: 'Run "nova repair" to restore .env.example.',
-    });
+  if (!pluginFilter) {
+    if (!(await fs.pathExists(path.join(targetDir, ".env.example")))) {
+      findings.push({
+        type: "missing-template-file",
+        severity: "warning",
+        classification: "SAFE TO REPAIR",
+        description: "Missing template baseline file: .env.example",
+        remediation: 'Run "nova repair" to restore .env.example.',
+      });
+    }
   }
 
   // 4. Missing plugin env keys in .env.example
   const envExamplePath = path.join(targetDir, ".env.example");
   if (await fs.pathExists(envExamplePath)) {
     const exampleContent = await fs.readFile(envExamplePath, "utf8");
-    for (const pluginId of config.plugins) {
+    for (const pluginId of targetPlugins) {
       const plugin = registry.getPlugin(pluginId);
       for (const envDecl of plugin?.env ?? []) {
         if (!exampleContent.includes(envDecl.key)) {
           findings.push({
             type: "missing-env-key",
             severity: "info",
+            classification: "SAFE TO REPAIR",
+            plugin: pluginId,
             description: `Plugin "${plugin?.name || pluginId}" declares environment variable "${envDecl.key}", but it is not documented in .env.example.`,
             remediation: 'Run "nova repair" to append missing plugin environment variables to .env.example.',
           });
@@ -486,17 +607,18 @@ export async function diffProject(targetDir: string): Promise<DriftFinding[]> {
 export interface UpgradeOptions {
   dryRun?: boolean;
   plugins?: string[];
+  all?: boolean;
 }
 
 export interface UpgradeResult {
   updatedDependencies: Array<{ name: string; from?: string; to: string }>;
   updatedDevDependencies: Array<{ name: string; from?: string; to: string }>;
   addedScripts: Array<{ name: string; command: string }>;
+  manualReview: string[];
   dryRun: boolean;
 }
 
-/** Reconciles dependency declarations with the installed plugin manifests;
- * it deliberately never overwrites project source/configuration files. */
+/** Reconciles dependency declarations with installed plugin manifests without overwriting user source files. */
 export async function upgradeProject(targetDir: string, options: UpgradeOptions = {}): Promise<UpgradeResult> {
   const { dryRun = false, plugins: requestedPlugins } = options;
   const { pkg, config } = await getProject(targetDir);
@@ -509,6 +631,7 @@ export async function upgradeProject(targetDir: string, options: UpgradeOptions 
   const updatedDependencies: Array<{ name: string; from?: string; to: string }> = [];
   const updatedDevDependencies: Array<{ name: string; from?: string; to: string }> = [];
   const addedScripts: Array<{ name: string; command: string }> = [];
+  const manualReview: string[] = [];
 
   const targetPlugins = requestedPlugins && requestedPlugins.length > 0
     ? config.plugins.filter((p) => requestedPlugins.includes(p))
@@ -541,16 +664,29 @@ export async function upgradeProject(targetDir: string, options: UpgradeOptions 
   }
 
   if (!dryRun) {
-    if (updatedDependencies.length || updatedDevDependencies.length || addedScripts.length) {
-      await fs.writeJson(path.join(targetDir, "package.json"), pkg, { spaces: 2 });
+    const transaction = new ProjectTransaction(targetDir);
+    transaction.begin();
+    try {
+      await transaction.snapshotFile("package.json");
+      await transaction.snapshotFile(".nova/project.json");
+      await transaction.snapshotFile(".nova.json");
+
+      if (updatedDependencies.length || updatedDevDependencies.length || addedScripts.length) {
+        await fs.writeJson(path.join(targetDir, "package.json"), pkg, { spaces: 2 });
+      }
+      await writeProjectConfig(targetDir, config);
+      transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
     }
-    await writeProjectConfig(targetDir, config);
   }
 
   return {
     updatedDependencies,
     updatedDevDependencies,
     addedScripts,
+    manualReview,
     dryRun,
   };
 }
@@ -559,91 +695,126 @@ export interface RepairResult {
   repairedFiles: string[];
   restoredScripts: string[];
   restoredEnvKeys: string[];
+  dryRun?: boolean;
 }
 
-/** Repairs deterministic metadata and template configuration drift. */
-export async function repairProject(targetDir: string): Promise<RepairResult> {
+/** Repairs deterministic metadata, scripts, and template configuration drift. */
+export async function repairProject(targetDir: string, options: { dryRun?: boolean } = {}): Promise<RepairResult> {
+  const { dryRun = false } = options;
   const { pkg, config } = await getProject(targetDir);
   const repairedFiles: string[] = [];
   const restoredScripts: string[] = [];
   const restoredEnvKeys: string[] = [];
   const registry = getPluginRegistry();
 
-  // 1. Repair .env.example
-  const envExamplePath = path.join(targetDir, ".env.example");
-  let envContent = (await fs.pathExists(envExamplePath)) ? await fs.readFile(envExamplePath, "utf8") : "# Environment Variables\n";
-  let envModified = false;
+  const transaction = new ProjectTransaction(targetDir);
+  if (!dryRun) {
+    transaction.begin();
+  }
 
-  for (const pluginId of config.plugins) {
-    const plugin = registry.getPlugin(pluginId);
-    for (const envDecl of plugin?.env ?? []) {
-      if (!envContent.includes(envDecl.key)) {
-        envContent += `\n# ${envDecl.description || plugin?.name || pluginId}\n${envDecl.key}=${envDecl.example || ""}\n`;
-        restoredEnvKeys.push(envDecl.key);
-        envModified = true;
+  try {
+    // 1. Repair .env.example
+    const envExamplePath = path.join(targetDir, ".env.example");
+    let envContent = (await fs.pathExists(envExamplePath)) ? await fs.readFile(envExamplePath, "utf8") : "# Environment Variables\n";
+    let envModified = false;
+
+    for (const pluginId of config.plugins) {
+      const plugin = registry.getPlugin(pluginId);
+      for (const envDecl of plugin?.env ?? []) {
+        if (!envContent.includes(envDecl.key)) {
+          envContent += `\n# ${envDecl.description || plugin?.name || pluginId}\n${envDecl.key}=${envDecl.example || ""}\n`;
+          restoredEnvKeys.push(envDecl.key);
+          envModified = true;
+        }
       }
     }
-  }
 
-  if (envModified || !(await fs.pathExists(envExamplePath))) {
-    await fs.writeFile(envExamplePath, envContent.trim() + "\n", "utf8");
-    repairedFiles.push(".env.example");
-  }
+    if (envModified || !(await fs.pathExists(envExamplePath))) {
+      if (!dryRun) {
+        await transaction.snapshotFile(".env.example");
+        await fs.writeFile(envExamplePath, envContent.trim() + "\n", "utf8");
+      }
+      repairedFiles.push(".env.example");
+    }
 
-  // 2. Repair missing plugin scripts in package.json
-  const scripts = ((pkg.scripts as Record<string, string> | undefined) ?? (pkg.scripts = {} as Record<string, string>));
-  let scriptsModified = false;
+    // 2. Repair missing plugin scripts in package.json
+    const scripts = ((pkg.scripts as Record<string, string> | undefined) ?? (pkg.scripts = {} as Record<string, string>));
+    let scriptsModified = false;
 
-  for (const pluginId of config.plugins) {
-    const plugin = registry.getPlugin(pluginId);
-    for (const [name, cmd] of Object.entries(plugin?.scripts ?? {})) {
-      if (!scripts[name]) {
-        scripts[name] = cmd;
-        restoredScripts.push(name);
-        scriptsModified = true;
+    for (const pluginId of config.plugins) {
+      const plugin = registry.getPlugin(pluginId);
+      for (const [name, cmd] of Object.entries(plugin?.scripts ?? {})) {
+        if (!scripts[name]) {
+          scripts[name] = cmd;
+          restoredScripts.push(name);
+          scriptsModified = true;
+        }
       }
     }
-  }
 
-  if (scriptsModified) {
-    await fs.writeJson(path.join(targetDir, "package.json"), pkg, { spaces: 2 });
-    repairedFiles.push("package.json (scripts)");
-  }
+    if (scriptsModified) {
+      if (!dryRun) {
+        await transaction.snapshotFile("package.json");
+        await fs.writeJson(path.join(targetDir, "package.json"), pkg, { spaces: 2 });
+      }
+      repairedFiles.push("package.json (scripts)");
+    }
 
-  // 3. Repair essential .gitignore entries
-  const gitignorePath = path.join(targetDir, ".gitignore");
-  if (await fs.pathExists(gitignorePath)) {
-    let gitignoreContent = await fs.readFile(gitignorePath, "utf8");
-    const essential = [".env", ".env*.local", ".nova/cache", "node_modules", ".next", "dist"];
-    let gitignoreChanged = false;
-    for (const rule of essential) {
-      if (!gitignoreContent.includes(rule)) {
-        gitignoreContent += `\n${rule}`;
-        gitignoreChanged = true;
+    // 3. Repair essential .gitignore entries
+    const gitignorePath = path.join(targetDir, ".gitignore");
+    if (await fs.pathExists(gitignorePath)) {
+      let gitignoreContent = await fs.readFile(gitignorePath, "utf8");
+      const essential = [".env", ".env*.local", ".nova/cache", "node_modules", ".next", "dist"];
+      let gitignoreChanged = false;
+      for (const rule of essential) {
+        if (!gitignoreContent.includes(rule)) {
+          gitignoreContent += `\n${rule}`;
+          gitignoreChanged = true;
+        }
+      }
+      if (gitignoreChanged) {
+        if (!dryRun) {
+          await transaction.snapshotFile(".gitignore");
+          await fs.writeFile(gitignorePath, gitignoreContent.trim() + "\n", "utf8");
+        }
+        repairedFiles.push(".gitignore");
       }
     }
-    if (gitignoreChanged) {
-      await fs.writeFile(gitignorePath, gitignoreContent.trim() + "\n", "utf8");
-      repairedFiles.push(".gitignore");
+
+    // 4. Ensure authoritative manifest in .nova/project.json is written and up to date
+    if (!dryRun) {
+      await transaction.snapshotFile(".nova/project.json");
+      await transaction.snapshotFile(".nova.json");
+      await writeProjectConfig(targetDir, config);
     }
+    repairedFiles.push(NOVA_MANIFEST_FILE);
+
+    if (!dryRun) {
+      transaction.commit();
+    }
+
+    return {
+      repairedFiles,
+      restoredScripts,
+      restoredEnvKeys,
+      dryRun,
+    };
+  } catch (error) {
+    if (!dryRun) {
+      await transaction.rollback();
+    }
+    throw error;
   }
-
-  // 4. Ensure authoritative manifest in .nova/project.json is written and up to date
-  await writeProjectConfig(targetDir, config);
-  repairedFiles.push(NOVA_MANIFEST_FILE);
-
-  return {
-    repairedFiles,
-    restoredScripts,
-    restoredEnvKeys,
-  };
 }
 
 export async function removePlugins(
   targetDir: string,
   requested: string[],
-  force = false,
-): Promise<{ removed: FeatureKey[]; skipped: string[] }> {
+  options: { force?: boolean; dryRun?: boolean } | boolean = false,
+): Promise<{ removed: FeatureKey[]; skipped: string[]; dryRun?: boolean }> {
+  const force = typeof options === "boolean" ? options : (options.force ?? false);
+  const dryRun = typeof options === "boolean" ? false : (options.dryRun ?? false);
+
   const { pkg, config } = await getProject(targetDir);
   const removed: FeatureKey[] = [];
   const skipped: string[] = [];
@@ -662,7 +833,7 @@ export async function removePlugins(
     removed.push(id as FeatureKey);
   }
 
-  if (!removed.length) return { removed, skipped };
+  if (!removed.length) return { removed, skipped, dryRun };
 
   const remaining = config.plugins.filter((plugin) => !removed.includes(plugin));
 
@@ -691,10 +862,24 @@ export async function removePlugins(
     }
   }
 
-  await fs.writeJson(path.join(targetDir, "package.json"), pkg, { spaces: 2 });
-  await writeProjectConfig(targetDir, { ...config, plugins: remaining });
+  if (!dryRun) {
+    const transaction = new ProjectTransaction(targetDir);
+    transaction.begin();
+    try {
+      await transaction.snapshotFile("package.json");
+      await transaction.snapshotFile(".nova/project.json");
+      await transaction.snapshotFile(".nova.json");
 
-  return { removed, skipped };
+      await fs.writeJson(path.join(targetDir, "package.json"), pkg, { spaces: 2 });
+      await writeProjectConfig(targetDir, { ...config, plugins: remaining });
+      transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
+  return { removed, skipped, dryRun };
 }
 
 export function listPlugins(query?: string): ReturnType<typeof listAllPluginInfo> {
@@ -702,11 +887,57 @@ export function listPlugins(query?: string): ReturnType<typeof listAllPluginInfo
   return listAllPluginInfo().filter(
     (plugin) =>
       !needle ||
-      [plugin.key, plugin.folder, plugin.metadata.name, plugin.metadata.description, getPluginRegistry().getPlugin(plugin.key)?.category]
+      [
+        plugin.key,
+        plugin.folder,
+        plugin.metadata.name,
+        plugin.metadata.description,
+        ...(plugin.metadata.capabilities ?? []),
+        ...(plugin.metadata.owns ?? []),
+        getPluginRegistry().getPlugin(plugin.key)?.category,
+      ]
         .join(" ")
         .toLowerCase()
         .includes(needle),
   );
+}
+
+export function getPluginTree(featureKey: FeatureKey): { plugin: FeatureKey; requires: FeatureKey[]; requiredBy: FeatureKey[] } {
+  const registry = getPluginRegistry();
+  const manifest = registry.getPlugin(featureKey);
+  const requires = (manifest?.requires ?? []) as FeatureKey[];
+  const all = listAllPluginInfo();
+  const requiredBy = all.filter((p) => p.metadata.requires?.includes(featureKey)).map((p) => p.key);
+
+  return {
+    plugin: featureKey,
+    requires,
+    requiredBy,
+  };
+}
+
+export function getPluginConflicts(featureKey: FeatureKey): Array<{ plugin: FeatureKey; name: string; reason: string }> {
+  const registry = getPluginRegistry();
+  const manifest = registry.getPlugin(featureKey);
+  const conflicts = (manifest?.conflicts ?? []) as FeatureKey[];
+  const all = listAllPluginInfo();
+
+  // Also include any plugins that declare a conflict on this plugin
+  const reverseConflicts = all.filter((p) => p.metadata.conflicts?.includes(featureKey)).map((p) => p.key);
+  const total = [...new Set([...conflicts, ...reverseConflicts])];
+
+  return total.map((c) => {
+    const conflictManifest = registry.getPlugin(c);
+    const reason =
+      manifest?.conflictReasons?.[c] ??
+      conflictManifest?.conflictReasons?.[featureKey] ??
+      `${manifest?.name || featureKey} and ${conflictManifest?.name || c} cannot both be active.`;
+    return {
+      plugin: c,
+      name: conflictManifest?.name ?? c,
+      reason,
+    };
+  });
 }
 
 /** Returns plugin manifests explicitly tracked by a project */

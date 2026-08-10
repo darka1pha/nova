@@ -197,6 +197,27 @@ export const FEATURE_CONTRIBUTIONS: Record<FeatureKey, PackageAdditions> = {
       "@supabase/ssr": "^0.5.2",
     },
   },
+  ai: {
+    dependencies: {
+      ai: "^4.0.34",
+      "@ai-sdk/react": "^1.0.10",
+    },
+  },
+  openai: {
+    dependencies: {
+      "@ai-sdk/openai": "^1.0.15",
+    },
+  },
+  anthropic: {
+    dependencies: {
+      "@ai-sdk/anthropic": "^1.0.12",
+    },
+  },
+  ollama: {
+    dependencies: {
+      "ollama-ai-provider": "^1.1.0",
+    },
+  },
 };
 
 

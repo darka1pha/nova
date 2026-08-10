@@ -1,4 +1,5 @@
 import type { PackageManager } from "@nova/core";
+export type { PackageManager };
 
 import type { PluginAnswers } from "./plugin/types.js";
 
@@ -33,10 +34,11 @@ export type FeatureKey =
   | "tiptap"
   | "trpc"
   | "graphql"
-  | "supabase";
-
-
-
+  | "supabase"
+  | "ai"
+  | "openai"
+  | "anthropic"
+  | "ollama";
 
 export type FeatureFlags = Record<FeatureKey, boolean>;
 
@@ -60,6 +62,8 @@ export interface Answers {
   installNow: boolean;
   initGit: boolean;
   features: FeatureFlags;
+  template?: string;
+  preset?: string;
 
   /**
    * Answers collected from each selected plugin's own `prompts` (see

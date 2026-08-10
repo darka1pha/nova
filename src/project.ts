@@ -15,6 +15,7 @@ export const NOVA_CONFIG_FILE = LEGACY_NOVA_CONFIG_FILE;
 export interface NovaProjectManifest {
   $schema: "https://nova.dev/schema/project.json";
   version: 1;
+  schemaVersion?: number;
   name?: string;
   novaVersion?: string;
   createdAt?: string;
@@ -22,8 +23,12 @@ export interface NovaProjectManifest {
   packageManager: PackageManager;
   uiLibrary: UiLibrary;
   projectType: "nextjs" | "react-native" | "expo";
+  template?: string;
+  preset?: string;
   plugins: FeatureKey[];
+  pluginVersions?: Record<string, string>;
   customMetadata?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export type NovaProjectConfig = NovaProjectManifest;
@@ -89,13 +94,77 @@ export function detectProjectType(pkg: Record<string, unknown>): "nextjs" | "rea
 }
 
 /**
+ * Deterministically migrates any raw manifest data to the latest schema (schemaVersion 1),
+ * preserving customMetadata and any unknown fields without data loss.
+ */
+export function migrateManifest(raw: unknown, defaultDirName = "app"): NovaProjectManifest {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {
+      $schema: "https://nova.dev/schema/project.json",
+      version: 1,
+      schemaVersion: 1,
+      name: defaultDirName,
+      novaVersion: getNovaCliVersion(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      packageManager: "npm",
+      uiLibrary: "shadcn",
+      projectType: "nextjs",
+      plugins: [],
+      pluginVersions: {},
+    };
+  }
+
+  const obj = raw as Record<string, unknown>;
+  const rawPlugins = Array.isArray(obj.plugins) ? obj.plugins : [];
+  const plugins = resolveKnownFeatures(rawPlugins.map(String));
+  const rawPluginVersions = typeof obj.pluginVersions === "object" && obj.pluginVersions !== null
+    ? (obj.pluginVersions as Record<string, string>)
+    : {};
+
+  const pluginVersions: Record<string, string> = { ...rawPluginVersions };
+  for (const plugin of plugins) {
+    if (!pluginVersions[plugin]) {
+      pluginVersions[plugin] = "1.0.0";
+    }
+  }
+
+  const result: NovaProjectManifest = {
+    ...obj,
+    $schema: "https://nova.dev/schema/project.json",
+    version: 1,
+    schemaVersion: 1,
+    name: typeof obj.name === "string" ? obj.name : defaultDirName,
+    novaVersion: typeof obj.novaVersion === "string" ? obj.novaVersion : getNovaCliVersion(),
+    createdAt: typeof obj.createdAt === "string" ? obj.createdAt : new Date().toISOString(),
+    updatedAt: typeof obj.updatedAt === "string" ? obj.updatedAt : new Date().toISOString(),
+    packageManager: (["npm", "pnpm", "yarn", "bun"].includes(obj.packageManager as string)
+      ? obj.packageManager
+      : "npm") as PackageManager,
+    uiLibrary: (["shadcn", "mui", "chakra", "ant", "mantine", "hero", "daisy", "headless"].includes(obj.uiLibrary as string)
+      ? obj.uiLibrary
+      : "shadcn") as UiLibrary,
+    projectType: (["nextjs", "react-native", "expo"].includes(obj.projectType as string)
+      ? obj.projectType
+      : "nextjs") as "nextjs" | "react-native" | "expo",
+    ...(typeof obj.template === "string" ? { template: obj.template } : {}),
+    ...(typeof obj.preset === "string" ? { preset: obj.preset } : {}),
+    plugins: [...new Set(plugins)].sort(),
+    pluginVersions,
+  };
+
+  return result;
+}
+
+/**
  * Reads project manifest from `.nova/project.json` or fallback `.nova.json`.
  */
 export async function readProjectConfig(targetDir: string): Promise<NovaProjectConfig | undefined> {
   const primaryPath = path.join(targetDir, NOVA_MANIFEST_FILE);
   if (await fs.pathExists(primaryPath)) {
     try {
-      return (await fs.readJson(primaryPath)) as NovaProjectConfig;
+      const raw = await fs.readJson(primaryPath);
+      return migrateManifest(raw, path.basename(targetDir));
     } catch {
       // Fall through to legacy check if JSON corrupted
     }
@@ -104,7 +173,8 @@ export async function readProjectConfig(targetDir: string): Promise<NovaProjectC
   const legacyPath = path.join(targetDir, LEGACY_NOVA_CONFIG_FILE);
   if (await fs.pathExists(legacyPath)) {
     try {
-      return (await fs.readJson(legacyPath)) as NovaProjectConfig;
+      const raw = await fs.readJson(legacyPath);
+      return migrateManifest(raw, path.basename(targetDir));
     } catch {
       return undefined;
     }
@@ -118,17 +188,33 @@ export async function readProjectConfig(targetDir: string): Promise<NovaProjectC
  */
 export async function writeProjectConfig(targetDir: string, config: NovaProjectConfig): Promise<void> {
   const now = new Date().toISOString();
+  const pkgData = await readProjectPackage(targetDir).catch(() => ({} as Record<string, unknown>));
+  const pkgName = typeof pkgData.name === "string" ? pkgData.name : undefined;
+
+  const plugins = [...new Set(config.plugins)].sort();
+  const pluginVersions: Record<string, string> = { ...(config.pluginVersions ?? {}) };
+  for (const plugin of plugins) {
+    if (!pluginVersions[plugin]) {
+      pluginVersions[plugin] = "1.0.0";
+    }
+  }
+
   const normalizedConfig: NovaProjectConfig = {
+    ...config,
     $schema: "https://nova.dev/schema/project.json",
     version: 1,
-    name: config.name ?? (await readProjectPackage(targetDir).catch(() => ({}))).name as string | undefined ?? path.basename(targetDir),
+    schemaVersion: 1,
+    name: config.name ?? pkgName ?? path.basename(targetDir),
     novaVersion: config.novaVersion ?? getNovaCliVersion(),
     createdAt: config.createdAt ?? now,
     updatedAt: now,
     packageManager: config.packageManager,
     uiLibrary: config.uiLibrary,
     projectType: config.projectType ?? "nextjs",
-    plugins: [...new Set(config.plugins)].sort(),
+    ...(config.template ? { template: config.template } : {}),
+    ...(config.preset ? { preset: config.preset } : {}),
+    plugins,
+    pluginVersions,
     ...(config.customMetadata ? { customMetadata: config.customMetadata } : {}),
   };
 
@@ -144,7 +230,7 @@ export async function writeProjectConfig(targetDir: string, config: NovaProjectC
 export async function initializeProjectConfig(
   targetDir: string,
   plugins: FeatureKey[] = [],
-  overrides: Partial<Pick<NovaProjectConfig, "packageManager" | "uiLibrary" | "projectType" | "name">> = {},
+  overrides: Partial<Pick<NovaProjectConfig, "packageManager" | "uiLibrary" | "projectType" | "name" | "template" | "preset">> = {},
 ): Promise<NovaProjectConfig> {
   const pkg = await readProjectPackage(targetDir);
   const existing = await readProjectConfig(targetDir);
@@ -153,6 +239,7 @@ export async function initializeProjectConfig(
   const config: NovaProjectConfig = existing ?? {
     $schema: "https://nova.dev/schema/project.json",
     version: 1,
+    schemaVersion: 1,
     name: overrides.name ?? String(pkg.name ?? path.basename(targetDir)),
     novaVersion: getNovaCliVersion(),
     createdAt: now,
@@ -160,14 +247,27 @@ export async function initializeProjectConfig(
     packageManager: overrides.packageManager ?? await detectProjectPackageManager(targetDir),
     uiLibrary: overrides.uiLibrary ?? detectProjectUiLibrary(pkg),
     projectType: overrides.projectType ?? detectProjectType(pkg),
+    template: overrides.template,
+    preset: overrides.preset,
     plugins,
+    pluginVersions: {},
   };
 
   if (overrides.name) config.name = overrides.name;
   if (overrides.packageManager) config.packageManager = overrides.packageManager;
   if (overrides.uiLibrary) config.uiLibrary = overrides.uiLibrary;
   if (overrides.projectType) config.projectType = overrides.projectType;
+  if (overrides.template) config.template = overrides.template;
+  if (overrides.preset) config.preset = overrides.preset;
   if (plugins.length) config.plugins = [...new Set([...config.plugins, ...plugins])];
+
+  config.schemaVersion = 1;
+  config.pluginVersions = config.pluginVersions || {};
+  for (const p of config.plugins) {
+    if (!config.pluginVersions[p]) {
+      config.pluginVersions[p] = "1.0.0";
+    }
+  }
 
   await writeProjectConfig(targetDir, config);
   return config;

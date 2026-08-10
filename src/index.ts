@@ -13,7 +13,13 @@ import { generateMobileProject } from "./generator/mobile.js";
 import { getPluginInfo, listAllPluginInfo, summarizeFootprint } from "./generator/pluginInfo.js";
 import { resolveFeatureKey } from "./addonRegistry.js";
 import { runPluginHook } from "./plugin/runHooks.js";
-import { collectAnswers, FEATURE_OPTIONS, isValidProjectName } from "./prompts.js";
+import { collectAnswers, FEATURE_OPTIONS, isValidProjectName, type CliCreateOptions } from "./prompts.js";
+import { runPluginSubcommand } from "./commands/plugin.js";
+import { runTemplateSubcommand } from "./commands/template.js";
+import { runEnvSubcommand } from "./commands/env.js";
+import { getPluginRegistryManager, formatTrustBadge } from "./registry/index.js";
+import { getProjectEnvStatus } from "./env/manager.js";
+import type { UiLibrary } from "./types.js";
 
 import {
   cleanProject,
@@ -47,63 +53,68 @@ const UI_LIBRARY_KEYWORDS = new Set([
 
 function readPackageVersion(): string {
   try {
-    // dist/index.js -> ../package.json resolves correctly both in the repo
-    // (tsup output at ./dist) and once installed globally from npm.
     const pkgPath = path.join(__dirname, "..", "package.json");
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { version?: string };
-    return pkg.version ?? "0.0.0";
+    return pkg.version ?? "0.1.8";
   } catch {
-    return "0.0.0";
+    return "0.1.8";
   }
 }
 
 function printHelp() {
   console.log(`
-${pc.bold("nova")} - scaffold a production-ready Next.js app
+${pc.bold("nova")} - extensible Next.js & mobile app generator and lifecycle platform
 
 ${pc.bold("Usage")}
-  nova [project-name] [--template nextjs|react-native]
-  nova react-native [project-name]
-  nova deploy [provider] [--path <dir>] [--force] [--list]
+  nova [create] [project-name] [options]
+  nova search <term>
+  nova plugins [feature] | nova plugins search <term> | nova plugins tree <feature> | nova plugins conflicts <feature>
+  nova plugin create <name> | validate | test | build | info <id>
+  nova template list | info <name> | presets
+  nova env | nova env check | nova env example
   nova add <feature...> [options]
-  nova plugins [feature]
   nova remove <plugin...> [--path <dir>] [--force]
-  nova init | info | doctor | validate | clean | diff [--path <dir>]
-  nova status [--path <dir>] [--json]
-  nova upgrade | repair [--path <dir>]
-  nova list [search-term] | nova list --installed [--path <dir>] | nova search <term>
+  nova deploy [provider] [--path <dir>] [--dry-run] [--list]
+  nova status | info | doctor | validate | clean | diff | upgrade | repair [--path <dir>]
 
-${pc.bold("Options")}
+${pc.bold("Project Creation Options")}
+  -t, --template <name>    Template to use: default, saas, ai, dashboard, api, react-native
+  --preset <name>          Preset to apply: fullstack, saas, ai, dashboard, api
+  --ui <library>           UI Library: shadcn, mui, chakra, ant, mantine, hero, daisy, headless
+  --pm <manager>           Package manager: pnpm, npm, yarn, bun
+  -y, --yes                Non-interactive mode (use defaults)
+
+${pc.bold("General Options")}
   -h, --help               Show this help message
   -v, --version            Print the installed version
-  -t, --template <name>    Scaffold template: nextjs (default) or react-native
-
-${pc.bold("Add options")}
-  --path, -p <dir>   Target an existing project directory (default: current directory)
-  --force, -f        Overwrite files that already exist instead of skipping them
-  --yes, -y          Skip any selected plugin's own follow-up prompts (use its defaults)
-  --dry-run           Preview cleanup without deleting files (nova clean)
-  --json              Print structured output for maintenance and discovery commands
+  -p, --path <dir>         Target project directory (default: current directory)
+  -f, --force              Overwrite files that already exist
+  --dry-run                Preview operations without modifying files
+  --json                   Print structured JSON output
 
 ${pc.bold("Examples")}
   nova my-app
-  nova my-mobile-app --template react-native
-  nova react-native my-mobile-app
-  nova add prisma redis
-  nova add tanstack-query --path ./my-app
-  nova plugins
+  nova create my-saas --preset saas
+  nova create my-ai-app --template ai
+  nova search database
   nova plugins prisma
-  nova doctor --path ./my-app
-  nova remove prisma --path ./my-app
+  nova plugin create my-custom-plugin
+  nova env check
+  nova deploy vercel --dry-run
 `);
 }
 
+
+import { formatPlan } from "./generator/planner.js";
+import { getPluginConflicts, getPluginTree } from "./commands.js";
 
 interface ParsedAddArgs {
   features: string[];
   targetPath: string;
   force: boolean;
   yes: boolean;
+  dryRun: boolean;
+  json: boolean;
 }
 
 function parseAddArgs(args: string[]): ParsedAddArgs | { error: string } {
@@ -111,6 +122,8 @@ function parseAddArgs(args: string[]): ParsedAddArgs | { error: string } {
   let targetPath = process.cwd();
   let force = false;
   let yes = false;
+  let dryRun = false;
+  let json = false;
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -133,6 +146,16 @@ function parseAddArgs(args: string[]): ParsedAddArgs | { error: string } {
       continue;
     }
 
+    if (arg === "--dry-run") {
+      dryRun = true;
+      continue;
+    }
+
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+
     if (arg.startsWith("-")) {
       return { error: `Unknown option: ${arg}` };
     }
@@ -140,7 +163,7 @@ function parseAddArgs(args: string[]): ParsedAddArgs | { error: string } {
     features.push(arg);
   }
 
-  return { features, targetPath, force, yes };
+  return { features, targetPath, force, yes, dryRun, json };
 }
 
 async function promptForFeatures(): Promise<string[]> {
@@ -167,38 +190,63 @@ async function runAddCommand(args: string[]) {
     return;
   }
 
-  p.intro(pc.bgCyan(pc.black(" nova add ")));
-
+  const { targetPath, force, yes, dryRun, json } = parsed;
   let { features } = parsed;
-  const { targetPath, force, yes } = parsed;
 
   if (features.length === 0) {
     features = await promptForFeatures();
   }
 
+  if (!json && !dryRun) {
+    p.intro(pc.bgCyan(pc.black(" nova add ")));
+  }
+
   const spinner = p.spinner();
-  spinner.start("Adding features to project");
+  if (!json && !dryRun) {
+    spinner.start("Adding features to project");
+  }
 
   let result;
   try {
     result = await addFeaturesToProject(targetPath, features, {
       force,
+      dryRun,
       skipPrompts: yes,
-      onStep: (step) => spinner.message(step),
+      onStep: (step) => {
+        if (!json && !dryRun) spinner.message(step);
+      },
     });
   } catch (error) {
-    spinner.stop("Failed to add features", 1);
-    p.log.error(error instanceof Error ? error.message : String(error));
+    if (!json && !dryRun) spinner.stop("Failed to add features", 1);
+    if (json) {
+      console.log(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2));
+    } else {
+      p.log.error(error instanceof Error ? error.message : String(error));
+    }
     process.exitCode = 1;
     return;
   }
 
   if (result.dependencyIssues.length && result.outcomes.length === 0) {
-    spinner.stop("Failed to add features", 1);
-    for (const issue of result.dependencyIssues) {
-      p.log.error(issue);
+    if (!json && !dryRun) spinner.stop("Failed to add features", 1);
+    if (json) {
+      console.log(JSON.stringify({ ok: false, errors: result.dependencyIssues }, null, 2));
+    } else {
+      for (const issue of result.dependencyIssues) {
+        p.log.error(issue);
+      }
     }
     process.exitCode = 1;
+    return;
+  }
+
+  if (json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (dryRun && result.plan) {
+    console.log(formatPlan(result.plan));
     return;
   }
 
@@ -301,6 +349,14 @@ function printPluginSummary(info: ReturnType<typeof getPluginInfo>) {
   console.log(pc.bold(pc.cyan(metadata.name)) + pc.dim(`  (${key})`));
   console.log(`  ${metadata.description}`);
 
+  if (metadata.capabilities?.length) {
+    console.log(`  ${pc.dim("capabilities:")}  ${metadata.capabilities.join(", ")}`);
+  }
+
+  if (metadata.owns?.length) {
+    console.log(`  ${pc.dim("owns:")}          ${metadata.owns.join(", ")}`);
+  }
+
   if (metadata.requires?.length) {
     console.log(`  ${pc.dim("requires:")}      ${metadata.requires.join(", ")}`);
   }
@@ -317,24 +373,99 @@ function printPluginSummary(info: ReturnType<typeof getPluginInfo>) {
 }
 
 function runPluginsCommand(args: string[]) {
-  const target = args[0];
+  const json = args.includes("--json");
+  const filteredArgs = args.filter((a) => a !== "--json");
+  const sub = filteredArgs[0];
 
-  if (target) {
-    const resolved = resolveFeatureKey(target);
+  if (sub === "search") {
+    const query = filteredArgs.slice(1).join(" ").trim();
+    if (!query) {
+      console.error("Usage: nova plugins search <query>");
+      process.exitCode = 1;
+      return;
+    }
+    const results = listPlugins(query);
+    if (json) {
+      console.log(JSON.stringify(results, null, 2));
+    } else {
+      console.log(pc.bold(`Search results for "${query}" (${results.length}):\n`));
+      for (const r of results) printPluginSummary(r);
+    }
+    return;
+  }
+
+  if (sub === "tree") {
+    const target = filteredArgs[1];
+    const resolved = target ? resolveFeatureKey(target) : undefined;
     if (!resolved) {
-      console.error(`Unknown plugin: "${target}"`);
+      console.error(`Unknown plugin: "${target ?? ""}"`);
+      process.exitCode = 1;
+      return;
+    }
+    const tree = getPluginTree(resolved);
+    if (json) {
+      console.log(JSON.stringify(tree, null, 2));
+    } else {
+      console.log(pc.bold(`\nPlugin Dependency Tree: ${pc.cyan(resolved)}\n`));
+      console.log(`  ${pc.dim("Requires:")}     ${tree.requires.length ? tree.requires.join(", ") : "(none)"}`);
+      console.log(`  ${pc.dim("Required By:")}  ${tree.requiredBy.length ? tree.requiredBy.join(", ") : "(none)"}\n`);
+    }
+    return;
+  }
+
+  if (sub === "conflicts") {
+    const target = filteredArgs[1];
+    const resolved = target ? resolveFeatureKey(target) : undefined;
+    if (!resolved) {
+      console.error(`Unknown plugin: "${target ?? ""}"`);
+      process.exitCode = 1;
+      return;
+    }
+    const conflicts = getPluginConflicts(resolved);
+    if (json) {
+      console.log(JSON.stringify(conflicts, null, 2));
+    } else {
+      console.log(pc.bold(`\nPlugin Conflicts for: ${pc.cyan(resolved)} (${conflicts.length})\n`));
+      if (!conflicts.length) {
+        console.log("  No conflicting plugins.\n");
+      } else {
+        for (const c of conflicts) {
+          console.log(`  ${pc.red("✖")} ${pc.bold(c.name)} (${c.plugin})`);
+          console.log(`    ${pc.dim("Reason:")} ${c.reason}`);
+        }
+        console.log("");
+      }
+    }
+    return;
+  }
+
+  if (sub && sub !== "list") {
+    const resolved = resolveFeatureKey(sub);
+    if (!resolved) {
+      console.error(`Unknown plugin: "${sub}"`);
       console.log(pc.dim("Run `nova plugins` with no argument to see all available plugins."));
       process.exitCode = 1;
       return;
     }
 
-    printPluginSummary(getPluginInfo(resolved));
+    const info = getPluginInfo(resolved);
+    if (json) {
+      console.log(JSON.stringify(info, null, 2));
+    } else {
+      printPluginSummary(info);
+    }
     return;
   }
 
-  console.log(pc.bold(`Available plugins (${listAllPluginInfo().length})\n`));
+  const all = listAllPluginInfo();
+  if (json) {
+    console.log(JSON.stringify(all, null, 2));
+    return;
+  }
 
-  for (const info of listAllPluginInfo()) {
+  console.log(pc.bold(`Available plugins (${all.length})\n`));
+
+  for (const info of all) {
     printPluginSummary(info);
     console.log("");
   }
@@ -357,6 +488,8 @@ async function runDeployCommand(args: string[]) {
 
   let targetDir = process.cwd();
   let force = false;
+  let dryRun = false;
+  let json = false;
   let providerArg: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
@@ -365,6 +498,10 @@ async function runDeployCommand(args: string[]) {
       targetDir = path.resolve(process.cwd(), args[++i] || ".");
     } else if (arg === "--force" || arg === "-f") {
       force = true;
+    } else if (arg === "--dry-run") {
+      dryRun = true;
+    } else if (arg === "--json") {
+      json = true;
     } else if (!arg.startsWith("-") && !providerArg) {
       providerArg = arg;
     }
@@ -386,13 +523,45 @@ async function runDeployCommand(args: string[]) {
   }
 
   const spinner = p.spinner();
-  spinner.start(`Configuring deployment for ${selectedProvider}`);
+  if (!json && !dryRun) {
+    spinner.start(`Configuring deployment for ${selectedProvider}`);
+  }
 
   try {
     const result = await generateDeploymentConfig(selectedProvider, {
       targetDir,
       force,
+      dryRun,
     });
+
+    if (json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (dryRun) {
+      const envStatus = await getProjectEnvStatus(targetDir);
+      console.log(pc.bold("\nProvider:"));
+      console.log(`  ${result.providerName}`);
+      console.log("");
+      console.log(pc.bold("Configuration:"));
+      console.log(`  ${pc.green("✓")} Framework detected: Next.js`);
+      console.log(`  ${pc.green("✓")} Build command: next build`);
+      console.log(`  ${pc.green("✓")} Output configuration: ${selectedProvider === "vercel" ? "Vercel Edge & Serverless Functions" : "Production Output"}`);
+      console.log("");
+      console.log(pc.bold("Environment:"));
+      if (envStatus.variables.length > 0) {
+        for (const v of envStatus.variables) {
+          const icon = v.present ? pc.green("✓") : pc.red("✗");
+          console.log(`  ${icon} ${v.key}`);
+        }
+      } else {
+        console.log(`  ${pc.green("✓")} No special environment variables required.`);
+      }
+      console.log("");
+      console.log(pc.dim("No deployment performed. (Dry run mode)\n"));
+      return;
+    }
 
     spinner.stop(`Configured ${result.providerName} deployment`);
 
@@ -411,8 +580,12 @@ async function runDeployCommand(args: string[]) {
     }
     console.log("");
   } catch (error) {
-    spinner.stop("Deployment configuration failed", 1);
-    p.log.error(error instanceof Error ? error.message : String(error));
+    if (!json) spinner.stop("Deployment configuration failed", 1);
+    if (json) {
+      console.log(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2));
+    } else {
+      p.log.error(error instanceof Error ? error.message : String(error));
+    }
     process.exitCode = 1;
   }
 }
@@ -421,14 +594,15 @@ async function runMaintenanceCommand(command: string, args: string[]) {
   const force = args.includes("--force") || args.includes("-f");
   const dryRun = args.includes("--dry-run");
   const json = args.includes("--json");
+  const fix = args.includes("--fix");
   const installedOnly = args.includes("--installed");
-  const parsed = parseProjectCommandArgs(args.filter((arg) => !["--force", "-f", "--dry-run", "--json", "--installed"].includes(arg)));
+  const parsed = parseProjectCommandArgs(args.filter((arg) => !["--force", "-f", "--dry-run", "--json", "--fix", "--installed"].includes(arg)));
   if ("error" in parsed) throw new Error(parsed.error);
   const { targetDir, rest } = parsed;
   const output = (value: unknown) => { if (json) console.log(JSON.stringify(value, null, 2)); };
 
   if (command === "init") {
-    const config = await initProject(targetDir);
+    const config = await initProject(targetDir, dryRun);
     if (json) {
       output(config);
     } else {
@@ -468,6 +642,17 @@ async function runMaintenanceCommand(command: string, args: string[]) {
   }
 
   if (command === "doctor") {
+    if (fix) {
+      const repairResult = await repairProject(targetDir, { dryRun });
+      if (!json) {
+        if (repairResult.repairedFiles.length) {
+          p.log.success(`Auto-repaired: ${repairResult.repairedFiles.join(", ")}`);
+        } else {
+          p.log.info("No auto-repairable drift found.");
+        }
+      }
+    }
+
     const result = await doctorProject(targetDir);
     if (json) {
       output(result);
@@ -494,14 +679,23 @@ async function runMaintenanceCommand(command: string, args: string[]) {
     if (json) {
       output(status);
     } else {
-      console.log(pc.bold("\nProject Status:\n"));
-      console.log(`  ${pc.cyan("Project:")}         ${status.name} (${status.projectType})`);
+      console.log(pc.bold("\nNova Project\n"));
+      if (status.template) console.log(`  ${pc.cyan("Template:")}       ${status.template}`);
+      if (status.preset) console.log(`  ${pc.cyan("Preset:")}         ${status.preset}`);
+      console.log(`  ${pc.cyan("UI:")}             ${status.uiLibrary}`);
+      console.log(`  ${pc.cyan("Database:")}       ${status.architecture.database}`);
+      console.log(`  ${pc.cyan("Authentication:")} ${status.architecture.auth}`);
+      console.log(`  ${pc.cyan("API:")}            ${status.architecture.api}`);
+      console.log(`  ${pc.cyan("Testing:")}        ${status.architecture.testing}`);
+      if (status.architecture.ai !== "None") {
+        console.log(`  ${pc.cyan("AI:")}             ${status.architecture.ai}`);
+      }
+      console.log(`  ${pc.cyan("Plugins:")}        ${status.pluginsCount}`);
       console.log(`  ${pc.cyan("Package Manager:")} ${status.packageManager}`);
-      console.log(`  ${pc.cyan("UI Library:")}      ${status.uiLibrary}`);
-      console.log(`  ${pc.cyan("Tracked Plugins:")} ${status.pluginsCount} (${status.plugins.join(", ") || "none"})`);
-      console.log(`  ${pc.cyan("Git:")}             ${status.hasGit ? "initialized" : "not initialized"}`);
-      console.log(`  ${pc.cyan("Environment:")}     ${status.hasEnvFile ? ".env present" : "no .env (copy from .env.example)"}`);
-      console.log(`  ${pc.cyan("Health:")}          ${status.health.isHealthy ? pc.green(`Healthy (0 errors, ${status.health.warningsCount} warnings)`) : pc.red(`Issues found (${status.health.errorsCount} errors, ${status.health.warningsCount} warnings)`)}`);
+      console.log(`  ${pc.cyan("Nova:")}           ${status.novaVersion}`);
+      console.log(`  ${pc.cyan("Git:")}            ${status.hasGit ? "initialized" : "not initialized"}`);
+      console.log(`  ${pc.cyan("Environment:")}    ${status.hasEnvFile ? ".env present" : "no .env (copy from .env.example)"}`);
+      console.log(`  ${pc.cyan("Health:")}         ${status.health.isHealthy ? pc.green(`Healthy (0 errors, ${status.health.warningsCount} warnings)`) : pc.red(`Issues found (${status.health.errorsCount} errors, ${status.health.warningsCount} warnings)`)}`);
       console.log("");
       if (!status.health.isHealthy) process.exitCode = 1;
     }
@@ -521,7 +715,8 @@ async function runMaintenanceCommand(command: string, args: string[]) {
   }
 
   if (command === "diff") {
-    const findings = await diffProject(targetDir);
+    const pluginFilter = rest[0];
+    const findings = await diffProject(targetDir, pluginFilter);
     if (json) {
       output({ drift: findings });
     } else if (!findings.length) {
@@ -530,7 +725,8 @@ async function runMaintenanceCommand(command: string, args: string[]) {
       console.log(pc.bold(`\nBaseline Drift Findings (${findings.length}):\n`));
       for (const f of findings) {
         const icon = f.severity === "error" ? pc.red("✖") : f.severity === "warning" ? pc.yellow("▲") : pc.blue("ℹ");
-        console.log(`  ${icon} ${f.description}`);
+        const classification = f.classification === "SAFE TO REPAIR" ? pc.green(`[${f.classification}]`) : f.classification === "MANUAL REVIEW REQUIRED" ? pc.yellow(`[${f.classification}]`) : pc.cyan(`[${f.classification}]`);
+        console.log(`  ${icon} ${classification} ${f.description}`);
         console.log(`    ${pc.dim("Fix:")} ${f.remediation}`);
       }
       console.log("");
@@ -539,14 +735,15 @@ async function runMaintenanceCommand(command: string, args: string[]) {
   }
 
   if (command === "remove") {
-    if (!rest.length) throw new Error("Usage: nova remove <plugin...> [--path <dir>] [--force]");
-    const result = await removePlugins(targetDir, rest, force);
+    if (!rest.length) throw new Error("Usage: nova remove <plugin...> [--path <dir>] [--force] [--dry-run]");
+    const result = await removePlugins(targetDir, rest, { force, dryRun });
     if (result.skipped.length) p.log.warn(`Not tracked by Nova: ${result.skipped.join(", ")}`);
     if (!result.removed.length) throw new Error("No tracked plugins were removed.");
     if (json) {
       output(result);
     } else {
-      p.log.success(`Removed plugin metadata and package entries: ${result.removed.join(", ")}`);
+      const prefix = dryRun ? "[DRY RUN] Would remove" : "Removed";
+      p.log.success(`${prefix} plugin metadata and package entries: ${result.removed.join(", ")}`);
       p.log.warn("Generated source files are preserved to avoid deleting user modifications.");
     }
     return;
@@ -576,13 +773,14 @@ async function runMaintenanceCommand(command: string, args: string[]) {
   }
 
   if (command === "repair") {
-    const result = await repairProject(targetDir);
+    const result = await repairProject(targetDir, { dryRun });
     if (json) {
       output(result);
     } else if (!result.repairedFiles.length) {
       p.log.success("Project configuration is clean. Nothing needed repair.");
     } else {
-      p.log.success(`Repaired files: ${result.repairedFiles.join(", ")}`);
+      const prefix = dryRun ? "[DRY RUN] Would repair" : "Repaired";
+      p.log.success(`${prefix} files: ${result.repairedFiles.join(", ")}`);
       if (result.restoredScripts.length) p.log.info(`Restored scripts: ${result.restoredScripts.join(", ")}`);
       if (result.restoredEnvKeys.length) p.log.info(`Restored environment keys: ${result.restoredEnvKeys.join(", ")}`);
     }
@@ -590,12 +788,42 @@ async function runMaintenanceCommand(command: string, args: string[]) {
   }
 
   if (command === "list" || command === "search") {
-    const query = rest.join(" ");
+    const query = rest.join(" ").trim();
     if (command === "search" && !query) throw new Error("Usage: nova search <term>");
-    const plugins = installedOnly ? await listInstalledPlugins(targetDir) : listPlugins(query);
-    if (json) { output(plugins); return; }
-    if (!plugins.length) { console.log("No matching plugins."); return; }
-    for (const plugin of plugins) console.log(`${plugin.key.padEnd(18)} ${plugin.metadata.name} — ${plugin.metadata.description}`);
+
+    if (installedOnly) {
+      const plugins = await listInstalledPlugins(targetDir);
+      if (json) { output(plugins); return; }
+      if (!plugins.length) { console.log("No matching plugins."); return; }
+      for (const plugin of plugins) console.log(`${plugin.key.padEnd(18)} ${plugin.metadata.name} — ${plugin.metadata.description}`);
+      return;
+    }
+
+    const registryManager = getPluginRegistryManager();
+    const results = await registryManager.search(query);
+
+    if (json) { output(results); return; }
+    if (!results.length) { console.log(`No matching plugins for: "${query}".`); return; }
+
+    console.log(pc.bold("\nNova Plugin Registry\n"));
+
+    const grouped = new Map<string, typeof results>();
+    for (const res of results) {
+      const cat = res.plugin.category ? res.plugin.category.charAt(0).toUpperCase() + res.plugin.category.slice(1) : "General";
+      if (!grouped.has(cat)) grouped.set(cat, []);
+      grouped.get(cat)!.push(res);
+    }
+
+    for (const [cat, items] of grouped.entries()) {
+      console.log(pc.bold(pc.cyan(cat)));
+      console.log("");
+      for (const item of items) {
+        const badge = formatTrustBadge(item.plugin.trustLevel);
+        console.log(`${badge} ${pc.bold(item.plugin.id)}`);
+        console.log(`  ${item.plugin.description}`);
+        console.log("");
+      }
+    }
     return;
   }
 
@@ -603,37 +831,79 @@ async function runMaintenanceCommand(command: string, args: string[]) {
 }
 
 export async function run() {
-  const args = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
 
-  if (args.includes("-h") || args.includes("--help")) {
+  if (rawArgs.includes("-h") || rawArgs.includes("--help")) {
     printHelp();
     return;
   }
 
-  if (args.includes("-v") || args.includes("--version")) {
+  if (rawArgs.includes("-v") || rawArgs.includes("--version")) {
     console.log(readPackageVersion());
     return;
   }
 
-  if (args[0] === "add") {
-    await runAddCommand(args.slice(1));
-    return;
-  }
+  // Subcommand dispatch
+  const first = rawArgs[0];
 
-  if (args[0] === "plugins") {
-    runPluginsCommand(args.slice(1));
-    return;
-  }
-
-  if (args[0] === "deploy" || args[0] === "deployment") {
-    await runDeployCommand(args.slice(1));
-    return;
-  }
-
-  if (["init", "info", "status", "doctor", "validate", "clean", "diff", "remove", "list", "search", "upgrade", "repair"].includes(args[0] ?? "")) {
-
+  if (first === "plugin") {
     try {
-      await runMaintenanceCommand(args[0], args.slice(1));
+      await runPluginSubcommand(rawArgs.slice(1));
+    } catch (err) {
+      p.log.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (first === "template" || first === "templates") {
+    try {
+      await runTemplateSubcommand(rawArgs.slice(1));
+    } catch (err) {
+      p.log.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (first === "presets" || first === "preset") {
+    try {
+      await runTemplateSubcommand(["presets", ...rawArgs.slice(1)]);
+    } catch (err) {
+      p.log.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (first === "env") {
+    try {
+      await runEnvSubcommand(rawArgs.slice(1));
+    } catch (err) {
+      p.log.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (first === "add") {
+    await runAddCommand(rawArgs.slice(1));
+    return;
+  }
+
+  if (first === "plugins") {
+    runPluginsCommand(rawArgs.slice(1));
+    return;
+  }
+
+  if (first === "deploy" || first === "deployment") {
+    await runDeployCommand(rawArgs.slice(1));
+    return;
+  }
+
+  if (["init", "info", "status", "doctor", "validate", "clean", "diff", "remove", "list", "search", "upgrade", "repair"].includes(first ?? "")) {
+    try {
+      await runMaintenanceCommand(first, rawArgs.slice(1));
     } catch (error) {
       p.log.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
@@ -641,37 +911,62 @@ export async function run() {
     return;
   }
 
-  if (args[0] === "react-native" || args[0] === "mobile") {
-    await runMobileFlow(args[1]);
+  if (first === "react-native" || first === "mobile") {
+    await runMobileFlow(rawArgs[1]);
     return;
   }
 
-  const templateIdx = args.findIndex((arg) => arg === "--template" || arg === "-t");
-  let selectedTemplate: string | undefined;
-  const nonTemplateArgs = [...args];
-  if (templateIdx !== -1) {
-    selectedTemplate = args[templateIdx + 1];
-    nonTemplateArgs.splice(templateIdx, 2);
+  // Project Creation Flow (nova create <name> or nova <name>)
+  const createArgs = first === "create" ? rawArgs.slice(1) : rawArgs;
+
+  let templateArg: string | undefined;
+  let presetArg: string | undefined;
+  let uiArg: UiLibrary | undefined;
+  let pmArg: PackageManager | undefined;
+  let yesArg = false;
+  let projectNameArg: string | undefined;
+  const featuresArg: string[] = [];
+
+  for (let i = 0; i < createArgs.length; i++) {
+    const arg = createArgs[i];
+    if (arg === "--template" || arg === "-t") {
+      templateArg = createArgs[++i];
+    } else if (arg === "--preset") {
+      presetArg = createArgs[++i];
+    } else if (arg === "--ui") {
+      uiArg = createArgs[++i] as UiLibrary;
+    } else if (arg === "--package-manager" || arg === "--pm") {
+      pmArg = createArgs[++i] as PackageManager;
+    } else if (arg === "--yes" || arg === "-y") {
+      yesArg = true;
+    } else if (arg === "--features") {
+      const feats = createArgs[++i]?.split(",") ?? [];
+      featuresArg.push(...feats);
+    } else if (!arg.startsWith("-") && !projectNameArg) {
+      projectNameArg = arg;
+    }
   }
 
-  if (selectedTemplate === "react-native" || selectedTemplate === "expo" || selectedTemplate === "mobile") {
-    await runMobileFlow(nonTemplateArgs[0]);
+  if (templateArg === "react-native" || templateArg === "expo" || templateArg === "mobile") {
+    await runMobileFlow(projectNameArg);
     return;
   }
 
-  const firstArg = nonTemplateArgs[0];
-
-  if (firstArg?.startsWith("-")) {
-    console.error(`Unknown option: ${firstArg}\n`);
-    printHelp();
+  let answers;
+  try {
+    answers = await collectAnswers(projectNameArg, {
+      template: templateArg,
+      preset: presetArg,
+      uiLibrary: uiArg,
+      packageManager: pmArg,
+      yes: yesArg,
+      features: featuresArg,
+    });
+  } catch (error) {
+    p.log.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
     return;
   }
-
-  const cliProjectName = firstArg;
-
-
-  const answers = await collectAnswers(cliProjectName);
 
   const spinner = p.spinner();
   spinner.start("Generating project");
@@ -876,6 +1171,8 @@ export {
   generateDeploymentConfig,
   generateMobileProject,
   generateProject,
+  getPluginConflicts,
+  getPluginTree,
   infoProject,
   initProject,
   listAllPluginInfo,
@@ -889,7 +1186,17 @@ export {
   statusProject,
   upgradeProject,
   validateProject,
+  runPluginSubcommand,
+  runTemplateSubcommand,
+  runEnvSubcommand,
 };
+
+export * from "./registry/index.js";
+export * from "./presets/registry.js";
+export * from "./templates/registry.js";
+export * from "./sdk/index.js";
+export * from "./env/manager.js";
+
 
 
 

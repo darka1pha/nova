@@ -38,6 +38,10 @@ export const ADDON_FOLDERS: Record<FeatureKey, string> = {
   trpc: "trpc",
   graphql: "graphql",
   supabase: "supabase",
+  ai: "ai",
+  openai: "openai",
+  anthropic: "anthropic",
+  ollama: "ollama",
 };
 
 
