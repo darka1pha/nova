@@ -1,0 +1,14 @@
+{
+  "$schema": "https://nova.dev/schema/project.json",
+  "version": 1,
+  "schemaVersion": 1,
+  "name": "@darkalpha/nova",
+  "novaVersion": "0.1.8",
+  "createdAt": "2026-08-10T06:45:48.732Z",
+  "updatedAt": "2026-08-10T06:45:48.733Z",
+  "packageManager": "pnpm",
+  "uiLibrary": "shadcn",
+  "projectType": "nextjs",
+  "plugins": [],
+  "pluginVersions": {}
+}

@@ -26,6 +26,8 @@ export const dockerComposePlugin = definePlugin({
   description: PLUGIN_METADATA.dockerCompose.description,
   category: "infrastructure",
   tags: ["docker", "compose"],
+  capabilities: PLUGIN_METADATA.dockerCompose.capabilities,
+  owns: PLUGIN_METADATA.dockerCompose.owns,
   dependencies: FEATURE_CONTRIBUTIONS.dockerCompose.dependencies,
   devDependencies: FEATURE_CONTRIBUTIONS.dockerCompose.devDependencies,
   scripts: FEATURE_CONTRIBUTIONS.dockerCompose.scripts,

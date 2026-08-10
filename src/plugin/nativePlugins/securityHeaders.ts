@@ -20,6 +20,8 @@ export const securityHeadersPlugin = definePlugin({
   description: PLUGIN_METADATA.securityHeaders.description,
   category: "infrastructure",
   tags: ["security", "headers", "csp"],
+  capabilities: PLUGIN_METADATA.securityHeaders.capabilities,
+  owns: PLUGIN_METADATA.securityHeaders.owns,
   dependencies: FEATURE_CONTRIBUTIONS.securityHeaders.dependencies,
   devDependencies: FEATURE_CONTRIBUTIONS.securityHeaders.devDependencies,
   scripts: FEATURE_CONTRIBUTIONS.securityHeaders.scripts,

@@ -19,7 +19,26 @@ export type PluginCategory =
   | "developer-experience"
   | "testing"
   | "documentation"
-  | "ui";
+  | "ui"
+  | "api";
+
+export type PluginCapability =
+  | "database"
+  | "authentication"
+  | "api"
+  | "state-management"
+  | "testing"
+  | "deployment"
+  | "observability"
+  | "email"
+  | "cms"
+  | "editor"
+  | "infrastructure"
+  | "security"
+  | "ui"
+  | "mobile"
+  | "ai"
+  | "developer-experience";
 
 /**
  * Shared read-only context every plugin contribution (template gating,
@@ -140,6 +159,8 @@ export interface PluginHooks {
   afterComplete?: (ctx: PluginResolutionContext) => void | Promise<void>;
 }
 
+export type PluginTrustLevel = "official" | "verified" | "community" | "experimental";
+
 /**
  * The single source of truth for one plugin: everything the CLI's
  * generation, `nova add`, `nova remove`, `nova plugins`, and (eventually)
@@ -155,8 +176,19 @@ export interface PluginManifest {
   version: string;
   description: string;
   category: PluginCategory;
+  author?: string;
+  license?: string;
+  homepage?: string;
+  repository?: string;
+  trustLevel?: PluginTrustLevel;
+  compatibility?: {
+    nova?: string;
+    node?: string;
+  };
   icon?: string;
   tags?: string[];
+  capabilities?: PluginCapability[];
+  owns?: string[];
 
   templates?: TemplateContribution[];
 
@@ -176,6 +208,8 @@ export interface PluginManifest {
   optional?: PluginId[];
   /** Plugin ids that cannot be selected at the same time as this plugin. */
   conflicts?: PluginId[];
+  /** Human-readable explanation for why this plugin conflicts with others. */
+  conflictReasons?: Record<PluginId, string>;
 
   supportedUI?: UiLibrary[];
   supportedPackageManagers?: PackageManager[];

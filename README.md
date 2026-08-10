@@ -324,25 +324,35 @@ Your application is now ready for development.
 
 ## CLI Usage
 
-Nova supports project creation, plugin management, and safe project maintenance.
+Nova supports complete project generation, architecture presets, templates, plugin development SDK, registry discovery, environment management, and lifecycle maintenance.
 
 ```text
-nova [project-name] [options]
+nova [create] [project-name] [--preset <preset>] [--template <template>] [--ui <ui>] [--pm <pm>] [-y]
+nova search <query>
+nova plugins [subcommand|feature] [options]
+nova plugin <create|validate|test|build|info> [options]
+nova template <list|info|presets> [options]
+nova presets
+nova env [check|example] [options]
 nova add <feature...> [options]
-nova plugins [feature]
-nova remove <plugin...> [--path <dir>] [--force]
-nova init | info | doctor | validate | clean | diff [--path <dir>]
+nova remove <plugin...> [--path <dir>] [--force] [--dry-run]
+nova init | info | doctor | validate | clean | diff [--path <dir>] [options]
 nova status [--path <dir>] [--json]
-nova upgrade | repair [--path <dir>]
-nova list [search-term]
-nova search <term>
+nova upgrade [--path <dir>] [--dry-run] [plugin...]
+nova repair [--path <dir>] [--dry-run]
+nova deploy [provider] [--path <dir>] [--force] [--dry-run] [--list]
 ```
 
 ### Options
 
 ```text
--h, --help       Show this help message
--v, --version    Print the installed version
+-h, --help               Show this help message
+-v, --version            Print the installed version
+-t, --template <name>    Template: default, saas, ai, dashboard, api, react-native
+--preset <name>          Architecture preset: fullstack, saas, ai, dashboard, api
+--ui <library>           UI Library: shadcn, mui, chakra, ant, mantine, hero, daisy, headless
+--pm, --package-manager  Package manager: pnpm, npm, yarn, bun
+-y, --yes                Non-interactive mode (apply defaults)
 ```
 
 ### Common options
@@ -350,102 +360,112 @@ nova search <term>
 ```text
 --path, -p <dir>   Target project directory (default: current directory)
 --force, -f        Overwrite files that already exist instead of skipping them
---json             Print structured output (maintenance and discovery commands)
+--dry-run          Preview planned changes without writing or modifying files
+--json             Print structured JSON output for scriptability and CI pipelines
+--fix              Automatically repair deterministic configuration and environment drift
 ```
 
 ### Examples
 
 ```bash
+# Project generation
 nova my-app
-nova
-nova add prisma redis
-nova add drizzle
-nova add tanstack-query --path ./my-app
+nova my-mobile-app --template react-native
+
+# Incremental plugin lifecycle with validation & dry-run
+nova add drizzle redis
+nova add trpc --dry-run
+nova remove drizzle --dry-run --path ./my-app
+
+# Plugin introspection & dependency graphs
 nova plugins
 nova plugins drizzle
-nova init --path ./my-app
-nova doctor --path ./my-app
-nova remove drizzle --path ./my-app
-nova search database
+nova plugins search auth
+nova plugins tree trpc
+nova plugins conflicts drizzle
+
+# Project maintenance & auto-repair
+nova info --path ./my-app
 nova status --path ./my-app --json
+nova doctor --path ./my-app --fix
+nova diff --path ./my-app
+nova upgrade --path ./my-app --dry-run
+nova repair --path ./my-app
+nova clean --path ./my-app --dry-run
 ```
 
-`nova init` creates `.nova.json`, Nova's project manifest. New projects and `nova add` create it automatically. It records selected plugins and lets `remove`, `validate`, `doctor`, and `upgrade` operate without guessing from user source files. `remove` intentionally preserves generated files; it removes only tracked package entries and manifest metadata.
+---
 
-Project names must contain only:
+## Project State Model & Manifest (`.nova/project.json`)
 
-- Lowercase letters
-- Numbers
-- Dashes
-- Underscores
+Nova stores its authoritative project state under `.nova/project.json` (and keeps `.nova.json` in sync for full backward compatibility). The state model tracks:
 
-The project name follows:
+- `schemaVersion` (Current: `1`) — enables automated migrations when Nova's state model evolves
+- `novaVersion` — records the Nova CLI version that created or last upgraded the project
+- `packageManager` & `uiLibrary` & `projectType`
+- `plugins` — list of actively tracked plugins
+- `pluginVersions` — precise version tracking for each installed plugin
+- `customMetadata` — arbitrary developer-defined metadata strictly preserved across operations
 
-```text
-^[a-z0-9-_]+$
+```json
+{
+  "$schema": "https://nova.dev/schema/project.json",
+  "version": 1,
+  "schemaVersion": 1,
+  "name": "my-app",
+  "novaVersion": "0.1.8",
+  "createdAt": "2026-08-10T00:00:00.000Z",
+  "updatedAt": "2026-08-10T00:00:00.000Z",
+  "packageManager": "pnpm",
+  "uiLibrary": "shadcn",
+  "projectType": "nextjs",
+  "plugins": ["drizzle", "redis", "trpc"],
+  "pluginVersions": {
+    "drizzle": "1.0.0",
+    "redis": "1.0.0",
+    "trpc": "1.0.0"
+  }
+}
 ```
-
-Invalid names (spaces, path separators, uppercase letters, `..`) are rejected before any files are written, whether passed as a CLI argument or typed into the interactive prompt.
-
-### Running in CI
-
-When `CI` is set in the environment, Nova automatically skips the "install dependencies now?" confirmation prompt so the process can run non-interactively, and its internal logger switches to a quieter, CI-friendly output level:
-
-```bash
-CI=true npx @darkalpha/nova my-app
-```
-
-You'll still want to run the package manager's install command afterward as a separate CI step.
 
 ---
 
 ## Project Maintenance
 
-Nova tracks its own changes in a small `.nova.json` manifest. It is created automatically for new projects and after `nova add`; use `nova init` once to adopt an existing compatible project. The manifest records the package manager, UI library, and plugins selected through Nova. It does not claim ownership of handwritten application code.
-
 | Command | Purpose |
 | --- | --- |
-| `nova status` | Show project identity and a health summary. |
-| `nova doctor` | Check Node.js, package metadata, required files, lockfile presence, and plugin validation. |
-| `nova validate` | Run plugin validations without writing project files. |
-| `nova info` | Print project, framework, package-manager, UI, and tracked-plugin details. |
-| `nova list --installed` | List only plugins recorded in the target project's manifest. |
-| `nova remove <plugin>` | Remove tracked package entries and manifest metadata; generated files remain intact. |
-| `nova upgrade` | Reconcile tracked plugin dependency declarations with Nova's current manifests. |
-| `nova repair` | Repair deterministic metadata drift and a missing `.env.example`. |
-| `nova diff` | Report detectable baseline drift, such as missing baseline files or unavailable plugin metadata. |
-| `nova clean [--dry-run]` | Remove generated caches such as `.next`, `.turbo`, and Nova cache files. |
-
-Maintenance commands accept `--path <dir>`. Discovery and maintenance commands also support `--json`, making them suitable for CI checks:
-
-```bash
-nova doctor --path ./my-app --json
-nova status --path ./my-app --json
-nova clean --path ./my-app --dry-run --json
-```
-
-`nova remove` is intentionally conservative: it never deletes generated source or configuration files, because they may have been edited after generation. Review those files separately after removing a plugin, then run your package manager's install command.
+| `nova status` | Show project identity, structure, active plugins, and health summary. |
+| `nova doctor [--fix]` | Comprehensive environment (Node, PM, OS), lockfile, dependencies, configuration, and plugin health diagnostics with transactional auto-repair. |
+| `nova validate` | Run plugin validations against current project state. |
+| `nova info` | Detailed project architecture, App/Pages router layout, cloud deployment statuses, available scripts, and plugin capabilities. |
+| `nova list [--installed]` | List available plugins or only plugins tracked in the active project. |
+| `nova remove <plugin...>` | Safely uninstalls plugin metadata, package dependencies, and scripts without deleting user-modified code. |
+| `nova upgrade [--dry-run]` | Reconcile tracked plugin dependency declarations and scripts with current manifests without clobbering user source files. |
+| `nova repair [--dry-run]` | Auto-repair deterministic metadata, `.env.example` contributions, missing scripts, and `.gitignore` hygiene. |
+| `nova diff [plugin]` | Report categorized drift (`[SAFE TO REPAIR]`, `[MANUAL REVIEW REQUIRED]`, `[INFORMATIONAL]`). |
+| `nova clean [--dry-run]` | Remove build artifacts and caches (`.next`, `.turbo`, `node_modules/.cache`, `.nova/cache`, `dist`). |
 
 ---
 
 ## Adding Features to an Existing Project (`nova add`)
 
-`nova add` copies an addon's files into a project that already exists on disk and merges its dependencies/scripts into that project's `package.json`. It's the incremental counterpart to running `nova <name>` from scratch — useful when you decide you want Prisma, Drizzle, Redis, Sentry, or any other plugin after the fact, without regenerating the whole app.
+`nova add` performs safe, transactional feature additions into existing projects.
 
-### Usage
+### Guarantees
 
-```bash
-nova add <feature...> [options]
-```
-
-If you omit the feature list, you get an interactive multiselect with the same options as the initial generator prompt.
+1. **Validate Before Write**: Checks requested plugins against already-installed plugins (e.g. rejecting Drizzle if Prisma is already active) before modifying anything.
+2. **Atomic Rollback**: If an error occurs during file generation, template rendering, config patching, or script merging, all mutations are automatically rolled back.
+3. **Dry-Run Preview**: Pass `--dry-run` to preview all planned file additions, modifications, package.json dependencies, and manifest changes.
 
 ### Options
 
-| Flag                 | Description                                                 |
-| -------------------- | ----------------------------------------------------------- |
-| `--path`, `-p <dir>` | Target project directory (default: current directory)       |
-| `--force`, `-f`      | Overwrite files that already exist instead of skipping them |
+| Flag | Description |
+| --- | --- |
+| `--path`, `-p <dir>` | Target project directory (default: current directory) |
+| `--force`, `-f` | Overwrite files that already exist instead of skipping them |
+| `--dry-run` | Preview planned operations without touching any file |
+| `--yes`, `-y` | Skip interactive plugin follow-up prompts (use defaults) |
+| `--json` | Print machine-readable JSON output |
 
 ### Examples
 
@@ -485,23 +505,121 @@ Full reference: `docs/nova-add-command.md` inside any generated project.
 
 ---
 
-## Inspecting Plugins (`nova plugins`)
+## Architecture Presets & Templates
 
-Before adding a plugin — or just to understand what one already in your project does — you can ask the CLI directly instead of reading source files:
-
-```bash
-nova plugins
-```
-
-Lists every available plugin with its description, any `requires`/`conflicts` constraints, which UI libraries it's restricted to (if any), and a summary of what it adds to `package.json`.
+Nova offers full-stack architectural presets and specialized starter templates to generate complete, ready-to-run systems in seconds:
 
 ```bash
-nova plugins drizzle
+# Create using an official preset
+nova create my-saas --preset saas
+nova create my-ai-app --preset ai
+nova create my-dashboard --preset dashboard
+
+# Create using a starter template
+nova create my-api-service --template api
 ```
 
-Shows the same detail for a single plugin.
+### Official Presets (`nova presets`)
 
-This command reads from the exact same metadata (`src/generator/pluginMetadata.ts`) and package contribution data (`src/featureContributions.ts`) that generation itself uses — there's nothing plugin-specific to keep in sync by hand, and the output can never drift from what `nova <name>` or `nova add` actually do.
+| Preset | Description | Included Plugins |
+| :--- | :--- | :--- |
+| **`fullstack`** | Fullstack Next.js production stack | `drizzle`, `betterAuth`, `trpc`, `tanstackQuery`, `vitest`, `playwright` |
+| **`saas`** | Subscription SaaS starter | `drizzle`, `betterAuth`, `tanstackQuery`, `sentry`, `reactEmail`, `dockerCompose`, `securityHeaders`, `health` |
+| **`ai`** | AI/LLM streaming application | `ai`, `openai`, `tanstackQuery`, `zustand` |
+| **`dashboard`** | Analytics & data visualization | `tanstackTable`, `recharts`, `tanstackQuery`, `zustand` |
+| **`api`** | Microservice & typed backend | `trpc`, `openapi`, `docker`, `health` |
+
+### Official Templates (`nova template list`)
+
+| Template | Focus | Architecture |
+| :--- | :--- | :--- |
+| **`default`** | Clean Next.js | Next.js App Router, Tailwind CSS, TypeScript |
+| **`saas`** | SaaS Platform | SaaS preset + shadcn UI |
+| **`ai`** | Conversational AI | AI preset + Vercel AI SDK + React Chat UI |
+| **`dashboard`** | Data Visualization | Dashboard preset + Data Tables & Charts |
+| **`api`** | API Backend | API preset + Headless App Router |
+
+---
+
+## AI & LLM Ecosystem
+
+Nova includes native first-class support for AI and LLM applications using the **Vercel AI SDK**:
+
+- **`ai`** — Core AI streaming SDK (`ai`, `@ai-sdk/react`), streaming route handlers (`src/app/api/chat/route.ts`), and reactive chat components (`src/components/ai/chat.tsx`).
+- **`openai`** — `@ai-sdk/openai` provider integration with OpenAI API key management.
+- **`anthropic`** — `@ai-sdk/anthropic` provider integration for Anthropic Claude models.
+- **`ollama`** — `ollama-ai-provider` for zero-cost, local LLM development.
+
+```bash
+# Add AI streaming to any existing Nova project
+nova add ai openai
+```
+
+---
+
+## Plugin Registry & Discovery
+
+Discover and inspect plugins across built-in, verified, and community sources:
+
+```bash
+# Search for plugins by keyword or category
+nova search database
+nova search ai
+
+# Search within the plugins subcommand
+nova plugins search auth
+
+# Inspect plugin dependency graph and conflicts
+nova plugins tree trpc
+nova plugins conflicts drizzle
+```
+
+---
+
+## Plugin Development SDK
+
+Nova provides an SDK and CLI commands to build, validate, test, and distribute custom plugins:
+
+```bash
+# Scaffold a new plugin workspace
+nova plugin create my-custom-plugin --category authentication
+
+# Validate plugin manifest and path safety
+nova plugin validate
+
+# Run automated lifecycle test simulation
+nova plugin test
+
+# Build plugin for distribution
+nova plugin build
+
+# Inspect any plugin's metadata and trust badge
+nova plugin info @nova/plugin-prisma
+```
+
+### Plugin Trust Levels
+
+- `✓ Official` — Built-in core plugins maintained by the Nova team.
+- `★ Verified` — Verified third-party partner plugins.
+- `Community` — Community ecosystem plugins.
+- `Experimental` — Preview or experimental plugins.
+
+---
+
+## Environment Management (`nova env`)
+
+Nova tracks environment variables declared by installed plugins and provides validation without exposing secret values:
+
+```bash
+# Check status of required and optional environment variables
+nova env
+
+# Validate required variables in CI pipelines (exits 1 if missing)
+nova env check
+
+# Synchronize .env.example with newly added plugin requirements
+nova env example
+```
 
 ---
 
@@ -576,13 +694,16 @@ The available options depend on the version of Nova you are using. Every plugin 
 
 - Prisma ORM
 - Drizzle ORM
+- Supabase
 - Better Auth
 - Redis
 - Strapi CMS
 - OpenAPI typed client
 
-## Data Fetching and State
+## APIs, Data Fetching and State
 
+- tRPC (end-to-end type safety)
+- GraphQL (Yoga + Codegen + typed client)
 - TanStack Query
 - TanStack Table
 - Zustand
@@ -601,10 +722,10 @@ The available options depend on the version of Nova you are using. Every plugin 
 - Mailpit
 - Tiptap rich text editor
 
-## Infrastructure and Operations
+## Infrastructure, Deployment and Operations
 
-- Docker
-- Docker Compose
+- Docker & Docker Compose
+- Cloud Deployment (Vercel, Cloudflare, Railway, Render, AWS, Docker)
 - Husky
 - lint-staged
 - PWA
@@ -616,18 +737,18 @@ The available options depend on the version of Nova you are using. Every plugin 
 ## Design and UX
 
 - Design System
-- Animations
+- Animations (Framer Motion)
 - Recharts
 
 ### Plugin summary table
 
 | Category                      | Options                                                                                                                 |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Data and Backend              | Prisma ORM, Drizzle ORM, Better Auth, Redis, Strapi CMS, OpenAPI typed client                                           |
-| Data Fetching and State       | TanStack Query, TanStack Table, Zustand, MSW API mocking                                                                |
+| Data and Backend              | Prisma ORM, Drizzle ORM, Supabase, Better Auth, Redis, Strapi CMS, OpenAPI typed client                                  |
+| APIs, Fetching & State        | tRPC, GraphQL (Yoga), TanStack Query, TanStack Table, Zustand, MSW API mocking                                          |
 | Testing                       | Vitest, Playwright, Cypress, Storybook                                                                                  |
 | Content and Communication     | React Email, Mailpit, Tiptap rich text editor                                                                           |
-| Infrastructure and Operations | Docker, Docker Compose, Husky + lint-staged, PWA, Bundle Analyzer, Sentry, Health/readiness endpoints, Security headers |
+| Infrastructure & Deployment   | Docker, Cloud Deployment (Vercel/Cloudflare/Railway/Render/AWS), Husky + lint-staged, PWA, Bundle Analyzer, Sentry, Health |
 | Design and UX                 | Design System, Animations, Recharts                                                                                     |
 
 Each plugin is a self-contained overlay under `templates/addons/<name>`. Enabling it copies its files on top of the base template and automatically wires in the required dependencies, scripts, and environment variables — there's no manual wiring step after generation. The same addon folders back `nova add`, so a feature behaves identically whether you selected it at scaffold time or added it later.
@@ -639,6 +760,7 @@ Each plugin also carries declarative metadata (`src/generator/pluginMetadata.ts`
 | Plugin A | Plugin B | Reason |
 | --- | --- | --- |
 | Prisma ORM (`prisma`) | Drizzle ORM (`drizzle`) | Both own `DATABASE_URL`-backed schema/migrations and would contribute colliding `db:*` scripts — pick one ORM per project. |
+
 
 If you need to evaluate both, generate two separate projects (or use `nova add` against two throwaway scaffolds) rather than trying to enable both in one.
 
@@ -1193,20 +1315,34 @@ When a plugin is added later via `nova add`, remember to also copy over any new 
 
 ## Deployment
 
-**Vercel (recommended default)** — push to a connected git repository; Vercel auto-detects Next.js. Set the environment variables from `.env.example` in the Vercel project settings.
+## Deployment
 
-**Docker (if selected during generation)**
+Nova provides first-class cloud deployment support through the `nova deploy` command, generating tailored configurations, automated CI/CD workflows, Dockerfiles, and production guides:
 
 ```bash
-docker build -t app .
-docker run -p 3000:3000 --env-file .env app
+# List supported cloud providers
+nova deploy --list
+
+# Configure deployment for your target cloud provider
+nova deploy vercel
+nova deploy cloudflare
+nova deploy railway
+nova deploy render
+nova deploy aws
+nova deploy docker
 ```
 
-The generated `Dockerfile` uses a multi-stage build (deps → build → runtime) and Next.js `output: "standalone"` for a minimal production image.
+### Supported Deployment Providers
+
+- **Vercel**: Generates `vercel.json` with Edge headers and `.github/workflows/deploy-vercel.yml` for automated preview and production deployments.
+- **Cloudflare Pages & Workers**: Generates `wrangler.toml` (with `nodejs_compat`) and `.github/workflows/deploy-cloudflare.yml`.
+- **Railway**: Generates `railway.json` with Nixpacks build config, healthcheck paths, and PostgreSQL/Redis provisioning guides.
+- **Render**: Generates `render.yaml` Infrastructure-as-Code blueprints for zero-configuration web service deployment.
+- **AWS**: Generates `apprunner.yaml` and `.github/workflows/deploy-aws.yml` for automated Docker builds and Amazon ECR pushes.
+- **Docker & Self-Hosted**: Generates a production multi-stage `Dockerfile.prod`, `docker-compose.prod.yml`, and reverse proxy guides in `docs/deployment/self-hosted.md`.
 
 Every variable in `.env.example` must be set in production — missing required variables fail fast at boot if you're using the generated `src/config/env.ts` validation.
 
-Provider-specific deployment tooling (Vercel/AWS/Cloudflare/Railway/Render config generators, `nova deploy`) is planned but not yet implemented — see [Roadmap](#roadmap).
 
 ---
 
@@ -1432,15 +1568,20 @@ Because a feature's package.json contribution now lives in exactly one file (`sr
 
 ## Roadmap
 
-The following are planned but **not yet implemented** — they are not selectable today via `nova`, `nova add`, or any prompt, and no code in this repository claims otherwise:
+Recently delivered capabilities:
 
-- **tRPC** — type-safe router/procedures integration with the App Router, evaluated alongside (not replacing) the existing `src/lib/api` layer.
-- **GraphQL** — a client/server integration appropriate for Next.js, with schema organization and typed codegen.
-- **Supabase** — client/server SDK integration, with explicit compatibility rules against Better Auth, Prisma, and Drizzle.
-- **React Native templates** — a mobile project template, likely requiring a `ProjectTemplate`/`ProjectType` concept distinct from the current Next.js-only generator so future non-Next.js targets don't turn the CLI into framework-specific conditionals.
-- **Cloud deployment providers** — a `deployment/<provider>` architecture (starting with a small number of providers) generating deployment configuration; not an authenticated, live "click to deploy" integration unless and until explicitly documented as such.
+- [x] **Drizzle ORM** — SQL-first schema and migration support with postgres-js and Drizzle Kit.
+- [x] **tRPC** — End-to-end type-safe API client and App Router procedures.
+- [x] **GraphQL** — GraphQL Yoga server with typed document codegen and GraphQL client.
+- [x] **Supabase** — SSR authentication, database client, and session management.
+- [x] **React Native Templates** — Expo SDK 52 mobile app scaffolding via `nova react-native` / `--template react-native`.
+- [x] **Cloud Deployment** — Modular provider-based architecture for Vercel, Cloudflare, Railway, Render, AWS, and Docker via `nova deploy`.
 
-Each will land as its own self-contained plugin (or, for React Native, a new template concept) following the same process as [Adding a New Plugin](#adding-a-new-plugin) and the Drizzle ORM plugin above, one at a time, with its own tests and documentation before the next begins.
+Future horizons under exploration:
+- Micro-frontends and Module Federation support
+- AI / LLM starter templates with Vercel AI SDK and LangChain
+- Multi-tenant SaaS workspace abstractions
+
 
 ---
 

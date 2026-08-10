@@ -20,6 +20,10 @@ import { initializeProjectConfig } from "./project.js";
 import { copyAddonWithRemap, hasSrcDirectory } from "./projectStructure.js";
 import type { FeatureKey, UiLibrary } from "./types.js";
 
+import { createEmptyPlan, type ProjectOperationPlan } from "./generator/planner.js";
+import { ProjectTransaction } from "./utils/transaction.js";
+import { readProjectConfig } from "./project.js";
+
 export interface AddFeatureOutcome {
   feature: FeatureKey;
   filesWritten: string[];
@@ -57,11 +61,15 @@ export interface AddFeaturesResult {
    * `outcomes` is empty and nothing was written to disk.
    */
   dependencyIssues: string[];
+  dryRun?: boolean;
+  plan?: ProjectOperationPlan;
 }
 
 export interface AddFeaturesOptions {
   /** Overwrite files that already exist in the target project. Default: false. */
   force?: boolean;
+  /** Preview all planned mutations without modifying any files or package.json. */
+  dryRun?: boolean;
   onStep?: (step: string) => void;
   /**
    * Skip running any selected plugin's own follow-up prompts (e.g. Prisma's
@@ -151,10 +159,12 @@ export async function addFeaturesToProject(
   options: AddFeaturesOptions = {},
 ): Promise<AddFeaturesResult> {
   const targetDir = path.resolve(targetDirInput);
-  const { force = false, onStep, skipPrompts = Boolean(process.env.CI) } = options;
+  const { force = false, dryRun = false, onStep, skipPrompts = Boolean(process.env.CI) } = options;
 
   const pkg = await readPackageJson(targetDir);
   const usesSrcDir = await hasSrcDirectory(targetDir);
+  const existingConfig = await readProjectConfig(targetDir);
+  const alreadyInstalled = existingConfig?.plugins ?? [];
 
   const unknownFeatures: string[] = [];
   const resolvedFeatures: FeatureKey[] = [];
@@ -172,13 +182,8 @@ export async function addFeaturesToProject(
 
   const registry = getPluginRegistry();
 
-  // Validate the selection (requires/conflicts/requires-cycles) against the
-  // plugin engine's dependency graph before writing anything - mirroring
-  // the up-front validation `generateProject` performs via
-  // `validatePluginSelection`, but expressed generically over
-  // `PluginManifest`s so `nova add` gets the same guarantee without
-  // duplicating that logic.
-  const dependencyGraph = resolveDependencyGraph(resolvedFeatures, registry);
+  // Validate the selection against existing project state and plugin engine constraints
+  const dependencyGraph = resolveDependencyGraph(resolvedFeatures, registry, { alreadyInstalled });
   const dependencyIssues = dependencyGraph.issues.map((issue) => issue.message);
 
   const hasBlockingIssue = dependencyGraph.issues.some(
@@ -192,21 +197,18 @@ export async function addFeaturesToProject(
       outcomes: [],
       unknownFeatures,
       dependencyIssues,
+      dryRun,
     };
   }
 
-  // Topological order so a plugin's requirement is always applied (files
-  // copied, package.json merged, patched) before the plugin that depends
-  // on it. Safe to cast back to FeatureKey[]: every id in the order came
-  // from `resolvedFeatures`, which is already FeatureKey[].
   const orderedFeatures = dependencyGraph.order as FeatureKey[];
 
   if (orderedFeatures.length === 0) {
-    return { targetDir, usesSrcDir, outcomes: [], unknownFeatures, dependencyIssues };
+    return { targetDir, usesSrcDir, outcomes: [], unknownFeatures, dependencyIssues, dryRun };
   }
 
-  const packageManager = await detectPackageManager(targetDir);
-  const uiLibrary = detectUiLibrary(pkg);
+  const packageManager = existingConfig?.packageManager ?? (await detectPackageManager(targetDir));
+  const uiLibrary = existingConfig?.uiLibrary ?? detectUiLibrary(pkg);
 
   onStep?.("Resolving plugin prompts");
   const pluginAnswers = skipPrompts ? {} : await runPluginPrompts(orderedFeatures, registry);
@@ -215,13 +217,10 @@ export async function addFeaturesToProject(
     projectName: typeof pkg.name === "string" ? pkg.name : path.basename(targetDir),
     packageManager,
     uiLibrary,
-    enabledPlugins: orderedFeatures,
+    enabledPlugins: [...new Set([...alreadyInstalled, ...orderedFeatures])],
     answers: pluginAnswers,
   };
 
-  // Plugin self-validation (see `PluginManifest.validate`), same guarantee
-  // full generation gives via `validatePlugins()` in
-  // `src/generator/index.ts`. Runs before any file is written.
   onStep?.("Validating plugin selection");
   const validationIssues = validatePlugins(orderedFeatures, registry, pluginContext);
   if (validationIssues.length > 0) {
@@ -236,110 +235,208 @@ export async function addFeaturesToProject(
           issue.errors.map((error) => `${issue.plugin}: ${error}`),
         ),
       ],
+      dryRun,
     };
   }
 
-  await runPluginHook("beforeGenerate", orderedFeatures, registry, pluginContext);
+  // If dry-run mode is active, simulate planned changes without modifying any files
+  if (dryRun) {
+    const plan = createEmptyPlan(targetDir, orderedFeatures);
+    const outcomes: AddFeatureOutcome[] = [];
 
-  // Phase 1 - render: copy each feature's addon files, then apply any
-  // plugin-declared `templates` contributions on top.
-  await runPluginHook("beforeRender", orderedFeatures, registry, pluginContext);
+    for (const feature of orderedFeatures) {
+      const addonFolder = ADDON_FOLDERS[feature];
+      const addonDir = path.join(ADDONS_DIR, addonFolder);
+      const plugin = registry.getPlugin(feature);
 
-  const renderResults = new Map<FeatureKey, RenderResult>();
+      const filesWritten: string[] = [];
+      const filesSkipped: string[] = [];
 
-  for (const feature of orderedFeatures) {
-    onStep?.(`Copying files for ${feature}`);
+      if (await fs.pathExists(addonDir)) {
+        const copyResult = await copyAddonWithRemap(addonDir, targetDir, {
+          hasSrcDir: usesSrcDir,
+          force,
+          dryRun: true,
+        });
+        filesWritten.push(...copyResult.written);
+        filesSkipped.push(...copyResult.skippedExisting);
+        plan.filesCreated.push(...copyResult.written);
+      }
 
-    const addonFolder = ADDON_FOLDERS[feature];
-    const addonDir = path.join(ADDONS_DIR, addonFolder);
+      const mergeResult = mergePackageAdditions(pkg, {
+        dependencies: plugin?.dependencies,
+        devDependencies: plugin?.devDependencies,
+        scripts: plugin?.scripts,
+      }, { dryRun: true });
 
-    let filesWritten: string[] = [];
-    let filesSkipped: string[] = [];
+      Object.assign(plan.dependenciesAdded, plugin?.dependencies ?? {});
+      Object.assign(plan.devDependenciesAdded, plugin?.devDependencies ?? {});
+      Object.assign(plan.scriptsAdded, plugin?.scripts ?? {});
 
-    if (await fs.pathExists(addonDir)) {
-      const copyResult = await copyAddonWithRemap(addonDir, targetDir, {
-        hasSrcDir: usesSrcDir,
-        force,
+      const envKeys: string[] = [];
+      for (const envDecl of plugin?.env ?? []) {
+        plan.envAdded.push({ key: envDecl.key, example: envDecl.example, description: envDecl.description });
+        envKeys.push(envDecl.key);
+      }
+
+      for (const patch of plugin?.patches ?? []) {
+        plan.patches.push({ target: patch.target, label: patch.label });
+      }
+
+      plan.manifestAdded.push(feature);
+
+      outcomes.push({
+        feature,
+        filesWritten,
+        filesSkipped,
+        addedDependencies: mergeResult.addedDependencies,
+        addedDevDependencies: mergeResult.addedDevDependencies,
+        addedScripts: mergeResult.addedScripts,
+        skippedScripts: mergeResult.skippedScripts,
+        appliedTemplates: [],
+        patchedFiles: (plugin?.patches ?? []).map((p) => p.target),
+        addedEnvKeys: envKeys,
+        skippedEnvKeys: [],
+        writtenDocs: (plugin?.docs ?? []).map((d) => d.path),
+        skippedDocs: [],
       });
-      filesWritten = copyResult.written;
-      filesSkipped = copyResult.skippedExisting;
     }
 
-    const templatesResult = await applyPluginTemplates(targetDir, [feature], registry, pluginContext);
+    plan.filesModified.push("package.json", ".env.example");
 
-    renderResults.set(feature, {
-      filesWritten,
-      filesSkipped,
-      appliedTemplates: templatesResult.appliedTemplates,
-    });
-  }
-
-  await runPluginHook("afterRender", orderedFeatures, registry, pluginContext);
-
-  // Phase 2 - patch: apply every feature's plugin-declared config patches.
-  await runPluginHook("beforePatch", orderedFeatures, registry, pluginContext);
-
-  const patchResults = new Map<FeatureKey, PatchResult>();
-
-  for (const feature of orderedFeatures) {
-    onStep?.(`Applying patches for ${feature}`);
-    const patchResult = await applyPluginPatches(targetDir, [feature], registry, pluginContext);
-    patchResults.set(feature, { patchedFiles: patchResult.patchedFiles });
-  }
-
-  await runPluginHook("afterPatch", orderedFeatures, registry, pluginContext);
-
-  // Phase 3 - complete: merge package.json contributions, env vars, docs.
-  await runPluginHook("beforeComplete", orderedFeatures, registry, pluginContext);
-
-  const outcomes: AddFeatureOutcome[] = [];
-
-  for (const feature of orderedFeatures) {
-    onStep?.(`Merging package.json for ${feature}`);
-    const plugin = registry.getPlugin(feature);
-    const mergeResult = mergePackageAdditions(pkg, {
-      dependencies: plugin?.dependencies,
-      devDependencies: plugin?.devDependencies,
-      scripts: plugin?.scripts,
-    });
-
-    onStep?.(`Merging environment variables for ${feature}`);
-    const envResult = await appendPluginEnvContributions(targetDir, [feature], registry);
-
-    onStep?.(`Writing documentation for ${feature}`);
-    const docsResult = await writePluginDocs(targetDir, [feature], registry, pluginContext);
-
-    const render = renderResults.get(feature) ?? {
-      filesWritten: [],
-      filesSkipped: [],
-      appliedTemplates: [],
+    return {
+      targetDir,
+      usesSrcDir,
+      outcomes,
+      unknownFeatures,
+      dependencyIssues,
+      dryRun: true,
+      plan,
     };
-    const patch = patchResults.get(feature) ?? { patchedFiles: [] };
-
-    outcomes.push({
-      feature,
-      filesWritten: render.filesWritten,
-      filesSkipped: render.filesSkipped,
-      addedDependencies: mergeResult.addedDependencies,
-      addedDevDependencies: mergeResult.addedDevDependencies,
-      addedScripts: mergeResult.addedScripts,
-      skippedScripts: mergeResult.skippedScripts,
-      appliedTemplates: render.appliedTemplates,
-      patchedFiles: patch.patchedFiles,
-      addedEnvKeys: envResult.addedKeys,
-      skippedEnvKeys: envResult.skippedKeys,
-      writtenDocs: docsResult.writtenDocs,
-      skippedDocs: docsResult.skippedDocs,
-    });
   }
 
-  onStep?.("Writing package.json");
-  await writePackageJson(targetDir, pkg);
+  // Live execution with transactional rollback support
+  const transaction = new ProjectTransaction(targetDir);
+  transaction.begin();
 
-  await runPluginHook("afterComplete", orderedFeatures, registry, pluginContext);
-  await runPluginHook("afterGenerate", orderedFeatures, registry, pluginContext);
+  try {
+    await transaction.snapshotFile("package.json");
+    await transaction.snapshotFile(".env.example");
+    await transaction.snapshotFile(".nova/project.json");
+    await transaction.snapshotFile(".nova.json");
 
-  await initializeProjectConfig(targetDir, orderedFeatures);
+    await runPluginHook("beforeGenerate", orderedFeatures, registry, pluginContext);
 
-  return { targetDir, usesSrcDir, outcomes, unknownFeatures, dependencyIssues };
+    // Phase 1 - render
+    await runPluginHook("beforeRender", orderedFeatures, registry, pluginContext);
+
+    const renderResults = new Map<FeatureKey, RenderResult>();
+
+    for (const feature of orderedFeatures) {
+      onStep?.(`Copying files for ${feature}`);
+
+      const addonFolder = ADDON_FOLDERS[feature];
+      const addonDir = path.join(ADDONS_DIR, addonFolder);
+
+      let filesWritten: string[] = [];
+      let filesSkipped: string[] = [];
+
+      if (await fs.pathExists(addonDir)) {
+        const copyResult = await copyAddonWithRemap(addonDir, targetDir, {
+          hasSrcDir: usesSrcDir,
+          force,
+        });
+        filesWritten = copyResult.written;
+        filesSkipped = copyResult.skippedExisting;
+        for (const file of copyResult.written) {
+          transaction.recordCreatedFile(file);
+        }
+      }
+
+      const templatesResult = await applyPluginTemplates(targetDir, [feature], registry, pluginContext);
+
+      renderResults.set(feature, {
+        filesWritten,
+        filesSkipped,
+        appliedTemplates: templatesResult.appliedTemplates,
+      });
+    }
+
+    await runPluginHook("afterRender", orderedFeatures, registry, pluginContext);
+
+    // Phase 2 - patch
+    await runPluginHook("beforePatch", orderedFeatures, registry, pluginContext);
+
+    const patchResults = new Map<FeatureKey, PatchResult>();
+
+    for (const feature of orderedFeatures) {
+      onStep?.(`Applying patches for ${feature}`);
+      const plugin = registry.getPlugin(feature);
+      for (const patch of plugin?.patches ?? []) {
+        await transaction.snapshotFile(patch.target);
+      }
+      const patchResult = await applyPluginPatches(targetDir, [feature], registry, pluginContext);
+      patchResults.set(feature, { patchedFiles: patchResult.patchedFiles });
+    }
+
+    await runPluginHook("afterPatch", orderedFeatures, registry, pluginContext);
+
+    // Phase 3 - complete
+    await runPluginHook("beforeComplete", orderedFeatures, registry, pluginContext);
+
+    const outcomes: AddFeatureOutcome[] = [];
+
+    for (const feature of orderedFeatures) {
+      onStep?.(`Merging package.json for ${feature}`);
+      const plugin = registry.getPlugin(feature);
+      const mergeResult = mergePackageAdditions(pkg, {
+        dependencies: plugin?.dependencies,
+        devDependencies: plugin?.devDependencies,
+        scripts: plugin?.scripts,
+      });
+
+      onStep?.(`Merging environment variables for ${feature}`);
+      const envResult = await appendPluginEnvContributions(targetDir, [feature], registry);
+
+      onStep?.(`Writing documentation for ${feature}`);
+      const docsResult = await writePluginDocs(targetDir, [feature], registry, pluginContext);
+
+      const render = renderResults.get(feature) ?? {
+        filesWritten: [],
+        filesSkipped: [],
+        appliedTemplates: [],
+      };
+      const patch = patchResults.get(feature) ?? { patchedFiles: [] };
+
+      outcomes.push({
+        feature,
+        filesWritten: render.filesWritten,
+        filesSkipped: render.filesSkipped,
+        addedDependencies: mergeResult.addedDependencies,
+        addedDevDependencies: mergeResult.addedDevDependencies,
+        addedScripts: mergeResult.addedScripts,
+        skippedScripts: mergeResult.skippedScripts,
+        appliedTemplates: render.appliedTemplates,
+        patchedFiles: patch.patchedFiles,
+        addedEnvKeys: envResult.addedKeys,
+        skippedEnvKeys: envResult.skippedKeys,
+        writtenDocs: docsResult.writtenDocs,
+        skippedDocs: docsResult.skippedDocs,
+      });
+    }
+
+    onStep?.("Writing package.json");
+    await writePackageJson(targetDir, pkg);
+
+    await runPluginHook("afterComplete", orderedFeatures, registry, pluginContext);
+    await runPluginHook("afterGenerate", orderedFeatures, registry, pluginContext);
+
+    await initializeProjectConfig(targetDir, orderedFeatures);
+    transaction.commit();
+
+    return { targetDir, usesSrcDir, outcomes, unknownFeatures, dependencyIssues, dryRun: false };
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }

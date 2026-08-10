@@ -2,6 +2,13 @@ import { dockerComposePlugin } from "./dockerCompose.js";
 import { drizzlePlugin } from "./drizzle.js";
 import { prismaPlugin } from "./prisma.js";
 import { securityHeadersPlugin } from "./securityHeaders.js";
+import { trpcPlugin } from "./trpc.js";
+import { graphqlPlugin } from "./graphql.js";
+import { supabasePlugin } from "./supabase.js";
+import { aiPlugin } from "./ai.js";
+import { openaiPlugin } from "./openai.js";
+import { anthropicPlugin } from "./anthropic.js";
+import { ollamaPlugin } from "./ollama.js";
 import type { PluginManifest } from "../types.js";
 
 /**
@@ -19,4 +26,13 @@ export const NATIVE_PLUGINS: PluginManifest[] = [
   drizzlePlugin,
   dockerComposePlugin,
   securityHeadersPlugin,
+  trpcPlugin,
+  graphqlPlugin,
+  supabasePlugin,
+  aiPlugin,
+  openaiPlugin,
+  anthropicPlugin,
+  ollamaPlugin,
 ];
+
+

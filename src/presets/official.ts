@@ -1,0 +1,75 @@
+import type { PresetDefinition } from "./types.js";
+
+export const OFFICIAL_PRESETS: PresetDefinition[] = [
+  {
+    id: "fullstack",
+    name: "Fullstack Application",
+    description: "Production fullstack Next.js with Drizzle ORM, Better Auth, tRPC, Query, and E2E testing",
+    category: "app",
+    defaultUiLibrary: "shadcn",
+    plugins: [
+      "drizzle",
+      "betterAuth",
+      "trpc",
+      "tanstackQuery",
+      "vitest",
+      "playwright",
+    ],
+  },
+  {
+    id: "saas",
+    name: "SaaS Starter",
+    description: "SaaS starter kit with database, authentication, emails, error monitoring, and security",
+    category: "saas",
+    defaultUiLibrary: "shadcn",
+    plugins: [
+      "drizzle",
+      "betterAuth",
+      "tanstackQuery",
+      "sentry",
+      "reactEmail",
+      "dockerCompose",
+      "securityHeaders",
+      "health",
+    ],
+  },
+  {
+    id: "ai",
+    name: "AI & LLM Application",
+    description: "AI-powered Next.js with Vercel AI SDK, OpenAI model integration, streaming UI, and client state",
+    category: "ai",
+    defaultUiLibrary: "shadcn",
+    plugins: [
+      "ai",
+      "openai",
+      "tanstackQuery",
+      "zustand",
+    ],
+  },
+  {
+    id: "dashboard",
+    name: "Analytics Dashboard",
+    description: "Data-heavy dashboard with TanStack Tables, Recharts charts, Query caching, and state",
+    category: "analytics",
+    defaultUiLibrary: "shadcn",
+    plugins: [
+      "tanstackTable",
+      "recharts",
+      "tanstackQuery",
+      "zustand",
+    ],
+  },
+  {
+    id: "api",
+    name: "API & Microservice",
+    description: "Type-safe API backend with tRPC, OpenAPI codegen, Docker, and health checks",
+    category: "api",
+    defaultUiLibrary: "headless",
+    plugins: [
+      "trpc",
+      "openapi",
+      "docker",
+      "health",
+    ],
+  },
+];

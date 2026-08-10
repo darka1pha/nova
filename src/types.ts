@@ -1,4 +1,5 @@
 import type { PackageManager } from "@nova/core";
+export type { PackageManager };
 
 import type { PluginAnswers } from "./plugin/types.js";
 
@@ -30,7 +31,14 @@ export type FeatureKey =
   | "animations"
   | "tanstackTable"
   | "recharts"
-  | "tiptap";
+  | "tiptap"
+  | "trpc"
+  | "graphql"
+  | "supabase"
+  | "ai"
+  | "openai"
+  | "anthropic"
+  | "ollama";
 
 export type FeatureFlags = Record<FeatureKey, boolean>;
 
@@ -44,13 +52,19 @@ export type UiLibrary =
   | "daisy"
   | "headless";
 
+export type ProjectType = "nextjs" | "react-native" | "expo";
+
 export interface Answers {
   projectName: string;
+  projectType?: ProjectType;
   packageManager: PackageManager;
   uiLibrary: UiLibrary;
   installNow: boolean;
   initGit: boolean;
   features: FeatureFlags;
+  template?: string;
+  preset?: string;
+
   /**
    * Answers collected from each selected plugin's own `prompts` (see
    * `src/plugin/prompts.ts`), keyed by plugin id then prompt name. Empty

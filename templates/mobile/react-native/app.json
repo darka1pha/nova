@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "__PROJECT_NAME__",
+    "slug": "__PROJECT_SLUG__",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#09090b"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nova.__PROJECT_SLUG__"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#09090b"
+      },
+      "package": "com.nova.__PROJECT_SLUG__"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

@@ -28,6 +28,7 @@ function sortKeys<T extends Record<string, string>>(obj: T): T {
 export function mergePackageAdditions(
   pkg: Record<string, unknown>,
   additions: PackageAdditions,
+  options: { dryRun?: boolean } = {},
 ): MergePackageResult {
   const result: MergePackageResult = {
     addedDependencies: [],
@@ -61,9 +62,11 @@ export function mergePackageAdditions(
     result.addedScripts.push(name);
   }
 
-  pkg.dependencies = sortKeys(dependencies);
-  pkg.devDependencies = sortKeys(devDependencies);
-  pkg.scripts = scripts;
+  if (!options.dryRun) {
+    pkg.dependencies = sortKeys(dependencies);
+    pkg.devDependencies = sortKeys(devDependencies);
+    pkg.scripts = scripts;
+  }
 
   return result;
 }

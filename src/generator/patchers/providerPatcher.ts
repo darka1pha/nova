@@ -23,12 +23,19 @@ const PROVIDER_CONTRIBUTIONS: ProviderContribution[] = [
     close: "</ChakraAppProvider>",
   },
   {
-    active: (ctx) => ctx.features.tanstackQuery,
+    active: (ctx) => ctx.features.trpc,
+    importLine: 'import { TRPCProvider } from "@/lib/trpc/provider";',
+    open: "<TRPCProvider>",
+    close: "</TRPCProvider>",
+  },
+  {
+    active: (ctx) => ctx.features.tanstackQuery && !ctx.features.trpc,
     importLine: 'import { QueryProvider } from "@/providers/query-provider";',
     open: "<QueryProvider>",
     close: "</QueryProvider>",
   },
 ];
+
 
 export async function patchAppProviders(
   targetDir: string,

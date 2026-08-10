@@ -35,7 +35,17 @@ export const ADDON_FOLDERS: Record<FeatureKey, string> = {
   tanstackTable: "tanstack-table",
   recharts: "recharts",
   tiptap: "tiptap",
+  trpc: "trpc",
+  graphql: "graphql",
+  supabase: "supabase",
+  ai: "ai",
+  openai: "openai",
+  anthropic: "anthropic",
+  ollama: "ollama",
 };
+
+
+
 
 /**
  * Accepts either the camelCase FeatureKey ("tanstackQuery"), the kebab-case
