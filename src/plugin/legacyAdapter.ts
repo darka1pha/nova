@@ -74,11 +74,14 @@ export function toPluginManifest(feature: FeatureKey): PluginManifest {
     description: metadata.description,
     category: LEGACY_CATEGORY[feature] ?? "infrastructure",
     tags: [ADDON_FOLDERS[feature]],
+    capabilities: metadata.capabilities,
+    owns: metadata.owns,
     dependencies: contribution.dependencies,
     devDependencies: contribution.devDependencies,
     scripts: contribution.scripts,
     requires: metadata.requires,
     conflicts: metadata.conflicts,
+    conflictReasons: metadata.conflictReasons as Record<string, string> | undefined,
     supportedUI: metadata.supportedUI,
   };
 }

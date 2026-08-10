@@ -15,6 +15,8 @@ export const supabasePlugin = definePlugin({
   description: PLUGIN_METADATA.supabase.description,
   category: "database",
   tags: ["supabase", "database", "auth", "storage", "postgres", "realtime"],
+  capabilities: PLUGIN_METADATA.supabase.capabilities,
+  owns: PLUGIN_METADATA.supabase.owns,
   dependencies: FEATURE_CONTRIBUTIONS.supabase.dependencies,
   devDependencies: FEATURE_CONTRIBUTIONS.supabase.devDependencies,
   scripts: FEATURE_CONTRIBUTIONS.supabase.scripts,
