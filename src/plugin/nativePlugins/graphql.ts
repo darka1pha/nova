@@ -15,6 +15,8 @@ export const graphqlPlugin = definePlugin({
   description: PLUGIN_METADATA.graphql.description,
   category: "developer-experience",
   tags: ["graphql", "yoga", "api", "codegen"],
+  capabilities: PLUGIN_METADATA.graphql.capabilities,
+  owns: PLUGIN_METADATA.graphql.owns,
   dependencies: FEATURE_CONTRIBUTIONS.graphql.dependencies,
   devDependencies: FEATURE_CONTRIBUTIONS.graphql.devDependencies,
   scripts: FEATURE_CONTRIBUTIONS.graphql.scripts,

@@ -15,6 +15,8 @@ export const trpcPlugin = definePlugin({
   description: PLUGIN_METADATA.trpc.description,
   category: "developer-experience",
   tags: ["api", "trpc", "typesafe", "rpc"],
+  capabilities: PLUGIN_METADATA.trpc.capabilities,
+  owns: PLUGIN_METADATA.trpc.owns,
   dependencies: FEATURE_CONTRIBUTIONS.trpc.dependencies,
   devDependencies: FEATURE_CONTRIBUTIONS.trpc.devDependencies,
   scripts: FEATURE_CONTRIBUTIONS.trpc.scripts,

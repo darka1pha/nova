@@ -25,11 +25,14 @@ export const drizzlePlugin = definePlugin({
   description: PLUGIN_METADATA.drizzle.description,
   category: "database",
   tags: ["orm", "drizzle", "postgres", "sql"],
+  capabilities: PLUGIN_METADATA.drizzle.capabilities,
+  owns: PLUGIN_METADATA.drizzle.owns,
   dependencies: FEATURE_CONTRIBUTIONS.drizzle.dependencies,
   devDependencies: FEATURE_CONTRIBUTIONS.drizzle.devDependencies,
   scripts: FEATURE_CONTRIBUTIONS.drizzle.scripts,
   requires: PLUGIN_METADATA.drizzle.requires,
   conflicts: PLUGIN_METADATA.drizzle.conflicts,
+  conflictReasons: PLUGIN_METADATA.drizzle.conflictReasons as Record<string, string> | undefined,
   supportedUI: PLUGIN_METADATA.drizzle.supportedUI,
   env: [
     {

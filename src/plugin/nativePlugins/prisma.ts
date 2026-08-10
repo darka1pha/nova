@@ -31,11 +31,14 @@ export const prismaPlugin = definePlugin({
   description: PLUGIN_METADATA.prisma.description,
   category: "database",
   tags: ["orm", "prisma"],
+  capabilities: PLUGIN_METADATA.prisma.capabilities,
+  owns: PLUGIN_METADATA.prisma.owns,
   dependencies: FEATURE_CONTRIBUTIONS.prisma.dependencies,
   devDependencies: FEATURE_CONTRIBUTIONS.prisma.devDependencies,
   scripts: FEATURE_CONTRIBUTIONS.prisma.scripts,
   requires: PLUGIN_METADATA.prisma.requires,
   conflicts: PLUGIN_METADATA.prisma.conflicts,
+  conflictReasons: PLUGIN_METADATA.prisma.conflictReasons as Record<string, string> | undefined,
   supportedUI: PLUGIN_METADATA.prisma.supportedUI,
   prompts: [
     {
