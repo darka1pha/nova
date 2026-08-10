@@ -35,14 +35,37 @@ export function validatePlugins(
 
   for (const id of enabledPlugins) {
     const plugin = registry.getPlugin(id);
-    if (!plugin?.validate) continue;
+    if (!plugin) continue;
+    const errors: string[] = [];
 
-    const result = plugin.validate(ctx);
-    if (!result) continue; // void/undefined => valid
-    if (result.ok) continue;
+    // UI framework compatibility check
+    if (plugin.supportedUI && plugin.supportedUI.length > 0 && !plugin.supportedUI.includes(ctx.uiLibrary)) {
+      errors.push(
+        `Plugin "${plugin.name}" does not support UI library "${ctx.uiLibrary}". Supported UI libraries: ${plugin.supportedUI.join(", ")}.`,
+      );
+    }
 
-    if (result.errors.length > 0) {
-      issues.push({ plugin: id, errors: result.errors });
+    // Package manager compatibility check
+    if (
+      plugin.supportedPackageManagers &&
+      plugin.supportedPackageManagers.length > 0 &&
+      !plugin.supportedPackageManagers.includes(ctx.packageManager)
+    ) {
+      errors.push(
+        `Plugin "${plugin.name}" does not support package manager "${ctx.packageManager}". Supported: ${plugin.supportedPackageManagers.join(", ")}.`,
+      );
+    }
+
+    // Custom plugin validator
+    if (plugin.validate) {
+      const result = plugin.validate(ctx);
+      if (result && !result.ok && result.errors.length > 0) {
+        errors.push(...result.errors);
+      }
+    }
+
+    if (errors.length > 0) {
+      issues.push({ plugin: id, errors });
     }
   }
 

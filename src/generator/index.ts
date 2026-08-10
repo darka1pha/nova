@@ -231,6 +231,8 @@ export async function generateProject(
   await initializeProjectConfig(targetDir, enabledPluginIds, {
     packageManager: answers.packageManager,
     uiLibrary: answers.uiLibrary,
+    template: answers.template,
+    preset: answers.preset,
   });
 
   await hooks.run("afterGenerate", context);
@@ -497,6 +499,10 @@ async function patchReadme(targetDir: string, answers: Answers) {
     trpc: "tRPC (type-safe APIs)",
     graphql: "GraphQL (Yoga + typed client)",
     supabase: "Supabase (SSR client + auth + db)",
+    ai: "Vercel AI SDK (Streaming & Chat UI)",
+    openai: "OpenAI Model Provider",
+    anthropic: "Anthropic Claude Provider",
+    ollama: "Ollama Local Model Provider",
   };
 
 
