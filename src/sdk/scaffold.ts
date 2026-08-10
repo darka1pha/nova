@@ -48,7 +48,7 @@ export async function scaffoldPlugin(options: ScaffoldPluginOptions): Promise<{ 
     author: options.author ?? "",
     license: "MIT",
     devDependencies: {
-      "@darkalpha/nova": "^0.1.8",
+      "@darkalpha/nova": "^0.1.9",
       typescript: "^5.7.2",
     },
     novaPlugin: {

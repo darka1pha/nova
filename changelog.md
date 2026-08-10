@@ -6,7 +6,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ---
 
-## [Unreleased]
+## [0.1.9] - 2026-08-10
 
 ### Added
 
@@ -98,5 +98,7 @@ Baseline referenced by this changelog's `[Unreleased]` section. See git history 
 
 ---
 
-[Unreleased]: https://github.com/darka1pha/nova/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/darka1pha/nova/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/darka1pha/nova/compare/v0.1.8...v0.1.9
+[0.1.8]: https://github.com/darka1pha/nova/compare/v0.1.6...v0.1.8
 [0.1.6]: https://github.com/darka1pha/nova/releases/tag/v0.1.6
