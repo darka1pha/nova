@@ -7,6 +7,7 @@ import {
   addFeaturesToProject,
   removePlugins,
   generateDeploymentConfig,
+  generateMobileProject,
   infoProject,
   statusProject,
   doctorProject,
@@ -282,6 +283,65 @@ try {
   assert.ok(realClean.includes(".next"));
   assert.ok(!(await fs.pathExists(dummyNextCache)), ".next should be deleted after real clean");
   console.log("✓ nova clean passed");
+
+  // -------------------------------------------------------------
+  // Phase 3 Integration Scenarios
+  // -------------------------------------------------------------
+  const {
+    getPluginRegistryManager,
+    scaffoldPlugin,
+    validatePluginPackage,
+    testPluginPackage,
+    resolvePreset,
+    resolveTemplate,
+    getProjectEnvStatus,
+    syncProjectEnvExample,
+  } = await import("../dist/index.js");
+
+  // Test AI plugin generation via nova add
+  const aiAddResult = await addFeaturesToProject(projectDir, ["ai", "openai"], { force: true, skipPrompts: true });
+  assert.equal(aiAddResult.dependencyIssues.length, 0, "add ai/openai should have no dependency issues");
+  assert.ok(await fs.pathExists(path.join(projectDir, "src/app/api/chat/route.ts")), "chat route.ts must exist");
+  assert.ok(await fs.pathExists(path.join(projectDir, "src/components/ai/chat.tsx")), "chat.tsx must exist");
+
+  const pkgAfterAi = await fs.readJson(path.join(projectDir, "package.json"));
+  assert.ok(pkgAfterAi.dependencies["ai"], "ai package must be present");
+  assert.ok(pkgAfterAi.dependencies["@ai-sdk/openai"], "@ai-sdk/openai package must be present");
+  console.log("✓ nova add ai & openai passed");
+
+  // Test env management in project
+  const envStatus = await getProjectEnvStatus(projectDir);
+  assert.ok(envStatus.variables.some((v) => v.key === "OPENAI_API_KEY"));
+  const envSync = await syncProjectEnvExample(projectDir);
+  const envExample = await fs.readFile(path.join(projectDir, ".env.example"), "utf8");
+  assert.ok(envExample.includes("OPENAI_API_KEY="));
+  console.log("✓ env management integration passed");
+
+  // Test Preset & Template resolutions
+  const saasPreset = resolvePreset("saas");
+  assert.equal(saasPreset.valid, true);
+  const aiTemplate = resolveTemplate("ai");
+  assert.equal(aiTemplate.valid, true);
+  console.log("✓ preset & template integration resolution passed");
+
+  // Test Plugin SDK full workflow
+  const sdkPluginDir = path.join(tmpRoot, "sample-plugin");
+  const scaffold = await scaffoldPlugin({
+    name: "sample-plugin",
+    targetDir: tmpRoot,
+    category: "developer-experience",
+  });
+  const pluginVal = await validatePluginPackage(scaffold.pluginDir);
+  assert.equal(pluginVal.valid, true);
+  const pluginTest = await testPluginPackage(scaffold.pluginDir);
+  assert.equal(pluginTest.passed, true);
+  console.log("✓ plugin sdk scaffold, validate & test integration passed");
+
+  // Test Registry discovery
+  const registryManager = getPluginRegistryManager();
+  const searchHits = await registryManager.search("ai");
+  assert.ok(searchHits.length >= 2, "Must find at least ai and openai");
+  console.log("✓ registry search integration passed");
 
   console.log("ALL INTEGRATION TESTS PASSED");
 } finally {

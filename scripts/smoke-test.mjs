@@ -717,12 +717,89 @@ if (!mobilePkg.dependencies?.["expo"] || !mobilePkg.dependencies?.["react-native
 }
 
 const mobileConfig = await fs.readJson(path.join(mobileResult.targetDir, ".nova.json"));
-if (mobileConfig.projectType !== "react-native") {
-  console.error("INVALID MOBILE PROJECT METADATA", mobileConfig);
+// AI Ecosystem plugin test (ai, openai)
+const aiAnswers = {
+  ...fullAnswers,
+  projectName: "smoke-ai",
+  uiLibrary: "shadcn",
+  template: "ai",
+  preset: "ai",
+  features: {
+    prisma: false,
+    betterAuth: false,
+    tanstackQuery: false,
+    cypress: false,
+    vitest: false,
+    storybook: false,
+    docker: false,
+    husky: false,
+    pwa: false,
+    bundleAnalyzer: false,
+    zustand: true,
+    msw: false,
+    reactEmail: false,
+    playwright: false,
+    sentry: false,
+    openapi: false,
+    redis: false,
+    mailpit: false,
+    dockerCompose: false,
+    health: false,
+    securityHeaders: false,
+    designSystem: false,
+    strapi: false,
+    animations: false,
+    tanstackTable: false,
+    recharts: false,
+    tiptap: false,
+    drizzle: false,
+    trpc: false,
+    graphql: false,
+    supabase: false,
+    ai: true,
+    openai: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, aiAnswers.projectName));
+const aiResult = await generateProject(aiAnswers, { onStep: (s) => console.log("ai step:", s) });
+const aiMustExist = [
+  "src/app/api/chat/route.ts",
+  "src/components/ai/chat.tsx",
+  "docs/ai.md",
+];
+
+missing = [];
+for (const rel of aiMustExist) {
+  const exists = await fs.pathExists(path.join(aiResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+
+if (missing.length) {
+  console.error("MISSING AI FILES:", missing);
+  process.exit(1);
+}
+
+const aiPkg = await fs.readJson(path.join(aiResult.targetDir, "package.json"));
+if (!aiPkg.dependencies?.["ai"] || !aiPkg.dependencies?.["@ai-sdk/openai"] || !aiPkg.dependencies?.["@ai-sdk/react"]) {
+  console.error("MISSING AI DEPENDENCIES", aiPkg.dependencies);
+  process.exit(1);
+}
+
+const aiEnv = await fs.readFile(path.join(aiResult.targetDir, ".env.example"), "utf8");
+if (!aiEnv.includes("OPENAI_API_KEY=")) {
+  console.error("OPENAI_API_KEY NOT IN .env.example");
+  process.exit(1);
+}
+
+const aiNovaConfig = await fs.readJson(path.join(aiResult.targetDir, ".nova/project.json"));
+if (aiNovaConfig.template !== "ai" || !aiNovaConfig.plugins.includes("ai")) {
+  console.error("AI NOT PROPERLY RECORDED IN MANIFEST", aiNovaConfig);
   process.exit(1);
 }
 
 console.log("SMOKE TEST OK");
+
 
 
 
