@@ -158,7 +158,7 @@ try {
   assert.equal(addSupabaseResult.dependencyIssues.length, 0, "add supabase should have no dependency issues");
   assert.ok(await fs.pathExists(path.join(projectDir, "src/lib/supabase/client.ts")), "supabase client.ts must exist");
   assert.ok(await fs.pathExists(path.join(projectDir, "src/lib/supabase/server.ts")), "supabase server.ts must exist");
-  assert.ok(await fs.pathExists(path.join(projectDir, "src/lib/supabase/middleware.ts")), "supabase middleware.ts must exist");
+  assert.ok(await fs.pathExists(path.join(projectDir, "src/lib/supabase/proxy.ts")), "supabase proxy.ts must exist");
 
   const pkgAfterSupabaseAdd = await fs.readJson(path.join(projectDir, "package.json"));
   assert.ok(pkgAfterSupabaseAdd.dependencies["@supabase/supabase-js"], "@supabase/supabase-js must be added");

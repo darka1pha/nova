@@ -56,9 +56,9 @@ function readPackageVersion(): string {
   try {
     const pkgPath = path.join(__dirname, "..", "package.json");
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { version?: string };
-    return pkg.version ?? "0.2.1";
+    return pkg.version ?? "0.2.2";
   } catch {
-    return "0.2.1";
+    return "0.2.2";
   }
 }
 

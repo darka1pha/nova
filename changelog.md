@@ -6,6 +6,18 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ---
 
+## [0.2.2] - 2026-08-16
+
+### Added
+
+- **Next.js 16 Proxy Architecture**: Replaced legacy `middleware.ts` with Next.js 16 native `src/proxy.ts` across all base templates, plugins, and patchers.
+  - Native Edge routing proxy in `templates/base/src/proxy.ts`
+  - Updated `securityHeaders` plugin to wrap `src/proxy.ts`
+  - Updated Supabase helper to `src/lib/supabase/proxy.ts`
+  - Updated Better Auth helper to `src/proxy/with-auth.ts`
+- **Modernized Base Template Landing Page**: Redesigned default `page.tsx` with a production-grade hero section, release pills, interactive CLI command snippet, Lucide feature cards, and modern tech stack badges.
+- **Architectural Compatibility Pinned Ranges**: Resolved `tailwindcss` to `^3.4.19` (Tailwind v3) and compiler tools within compatible ranges to prevent breaking PostCSS and Turbopack setups.
+
 ## [0.2.1] - 2026-08-16
 
 ### Added
@@ -133,7 +145,8 @@ Baseline referenced by this changelog's `[Unreleased]` section. See git history 
 
 ---
 
-[Unreleased]: https://github.com/darka1pha/nova/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/darka1pha/nova/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/darka1pha/nova/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/darka1pha/nova/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/darka1pha/nova/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/darka1pha/nova/compare/v0.1.8...v0.1.9

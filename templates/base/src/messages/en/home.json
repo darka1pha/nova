@@ -1,5 +1,35 @@
 {
-  "title": "Ship enterprise Next.js apps faster",
-  "description": "This starter includes i18n, auth token rotation, forms, validation, and a type-safe API layer out of the box.",
-  "cta": "Get started"
+  "badge": "Next.js 16 • React 19 • App Router",
+  "title": "Ship Production-Grade Next.js Apps at Scale",
+  "description": "An enterprise-ready Next.js 16 foundation engineered with type-safe routing, native edge proxying, internationalization, accessible UI primitives, and modular plugin architecture.",
+  "cta": "Get Started",
+  "docs": "Explore Documentation",
+  "cliPill": "npx nova create my-app",
+  "features": {
+    "proxy": {
+      "title": "Next.js 16 Proxy Architecture",
+      "description": "Edge-ready request interceptor with native src/proxy.ts, React 19 Server Components, and Turbopack bundler."
+    },
+    "i18n": {
+      "title": "Type-Safe Internationalization",
+      "description": "Built-in multi-language routing and message translations with next-intl and seamless RTL support."
+    },
+    "styling": {
+      "title": "Design System & Dark Mode",
+      "description": "Tailwind CSS paired with Radix UI accessible primitives and instant dark/light theme switching."
+    },
+    "plugins": {
+      "title": "Modular Plugin Ecosystem",
+      "description": "Easily compose databases (Drizzle/Prisma), Auth (Better Auth), tRPC, and Vercel AI SDK on demand."
+    }
+  },
+  "stack": {
+    "title": "Powered by Modern Web Technologies",
+    "nextjs": "Next.js 16",
+    "react": "React 19",
+    "tailwind": "Tailwind CSS",
+    "typescript": "TypeScript 5",
+    "turbopack": "Turbopack",
+    "i18n": "next-intl"
+  }
 }

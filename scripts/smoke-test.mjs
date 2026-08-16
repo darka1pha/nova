@@ -655,7 +655,7 @@ const supabaseResult = await generateProject(supabaseAnswers, { onStep: (s) => c
 const supabaseMustExist = [
   "src/lib/supabase/client.ts",
   "src/lib/supabase/server.ts",
-  "src/lib/supabase/middleware.ts",
+  "src/lib/supabase/proxy.ts",
   "src/lib/supabase/types.ts",
   "src/components/examples/supabase-auth-panel.tsx",
   "docs/supabase.md",

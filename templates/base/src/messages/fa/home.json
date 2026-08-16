@@ -1,5 +1,35 @@
 {
-  "title": "Ship enterprise Next.js apps faster",
-  "description": "This starter includes i18n, auth token rotation, forms, validation, and a type-safe API layer out of the box.",
-  "cta": "Get started"
+  "badge": "Next.js 16 • React 19 • App Router",
+  "title": "توسعه و انتشار سریع برنامه‌های مدرن Next.js",
+  "description": "پایه‌ای قدرتمند و آماده تولید مبتنی بر Next.js 16 همراه با مسیریابی تایپ‌سیف، پروکسی نیتیو، بین‌المللی‌سازی (i18n)، کامپوننت‌های مدرن و معماری ماژولار پلاگین‌ها.",
+  "cta": "شروع به کار",
+  "docs": "مستندات پروژه",
+  "cliPill": "npx nova create my-app",
+  "features": {
+    "proxy": {
+      "title": "معماری پروکسی Next.js 16",
+      "description": "مدیریت و پروکسی درخواست‌های لبه با فایل اختصاصی src/proxy.ts، کامپوننت‌های سرور React 19 و باندلر توربوپک."
+    },
+    "i18n": {
+      "title": "بین‌المللی‌سازی تایپ‌سیف",
+      "description": "پشتیبانی داخلی از چندزبانگی و ترجمه پیام‌ها با next-intl به همراه سازگاری کامل با راست‌به‌چپ (RTL)."
+    },
+    "styling": {
+      "title": "سیستم طراحی و حالت تاریک",
+      "description": "ترکیب قدرتمند Tailwind CSS با کامپوننت‌های دسترس‌پذیر Radix UI و سوییچ نرم تم تاریک و روشن."
+    },
+    "plugins": {
+      "title": "اکوسیستم ماژولار پلاگین‌ها",
+      "description": "اتصال آسان دیتابیس (Drizzle/Prisma)، سیستم احراز هویت (Better Auth)، لایه tRPC و هوش مصنوعی Vercel AI SDK."
+    }
+  },
+  "stack": {
+    "title": "قدرت‌گرفته از مدرن‌ترین فناوری‌های وب",
+    "nextjs": "Next.js 16",
+    "react": "React 19",
+    "tailwind": "Tailwind CSS",
+    "typescript": "TypeScript 5",
+    "turbopack": "توربوپک",
+    "i18n": "next-intl"
+  }
 }

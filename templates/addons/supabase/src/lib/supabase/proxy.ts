@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 /**
  * Refreshes auth tokens stored in cookies and passes them downstream.
- * Call this in your Next.js middleware if you need user session preservation.
+ * Call this in your Next.js proxy (src/proxy.ts) if you need user session preservation.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({

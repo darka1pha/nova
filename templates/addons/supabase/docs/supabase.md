@@ -6,7 +6,7 @@ This project includes an official **Supabase** setup configured for Next.js App 
 
 - **`src/lib/supabase/client.ts`**: Browser client for Client Components (`createBrowserClient`).
 - **`src/lib/supabase/server.ts`**: Server client for Server Components, Route Handlers, and Server Actions (`createServerClient` with `next/headers` cookies).
-- **`src/lib/supabase/middleware.ts`**: Session refresh helper (`updateSession`).
+- **`src/lib/supabase/proxy.ts`**: Session refresh helper (`updateSession`).
 - **`src/lib/supabase/types.ts`**: TypeScript definitions for your database schema.
 
 ## Environment Variables
