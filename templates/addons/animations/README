@@ -1,6 +1,6 @@
 # Animations & Motion Plugin
 
-This addon adds Framer Motion integration with pre-built animation variants.
+This addon adds Motion (formerly Framer Motion) integration with pre-built animation variants.
 
 ## Features
 
@@ -20,10 +20,10 @@ This addon adds Framer Motion integration with pre-built animation variants.
 
 ## Quick Start
 
-1. Import animation variants:
+1. Import animation variants and Motion component:
 
 ```tsx
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { fadeInUpVariants } from "@/lib/animations";
 ```
 
@@ -52,4 +52,4 @@ import { fadeInUpVariants } from "@/lib/animations";
 
 ## Dependencies
 
-- `framer-motion` — Added automatically when this addon is selected
+- `motion` — Added automatically when this addon is selected

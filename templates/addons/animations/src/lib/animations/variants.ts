@@ -1,5 +1,5 @@
 /**
- * Animation variants and presets using Framer Motion.
+ * Animation variants and presets using Motion.
  * These can be used with the motion component: <motion.div variants={fadeIn}>
  */
 

@@ -1,6 +1,8 @@
 import path from "node:path";
 import pc from "picocolors";
 
+import type { PackageResolutionStrategy } from "../resolver/types.js";
+
 export interface ProjectOperationPlan {
   targetDir: string;
   plugins?: string[];
@@ -18,6 +20,12 @@ export interface ProjectOperationPlan {
   manifestAdded: string[];
   manifestRemoved: string[];
   manifestUpdated?: Record<string, unknown>;
+  /** Package version resolution metadata (populated during dry-run). */
+  resolvedVersions?: Record<string, {
+    strategy: PackageResolutionStrategy;
+    resolved: string;
+    range?: string;
+  }>;
 }
 
 export function createEmptyPlan(targetDir: string, plugins: string[] = []): ProjectOperationPlan {
@@ -37,6 +45,7 @@ export function createEmptyPlan(targetDir: string, plugins: string[] = []): Proj
     patches: [],
     manifestAdded: [],
     manifestRemoved: [],
+    resolvedVersions: {},
   };
 }
 
@@ -149,6 +158,15 @@ export function formatPlan(plan: ProjectOperationPlan): string {
     }
     for (const p of plan.manifestRemoved) {
       lines.push(`  ${pc.red("-")} ${p}`);
+    }
+    lines.push("");
+  }
+
+  if (plan.resolvedVersions && Object.keys(plan.resolvedVersions).length > 0) {
+    lines.push(pc.bold("Resolved Package Versions:"));
+    for (const [name, info] of Object.entries(plan.resolvedVersions)) {
+      const strategyLabel = pc.dim(`(${info.strategy})`);
+      lines.push(`  ${name} ${pc.green(info.resolved)} ${strategyLabel}${info.range ? pc.dim(` range: ${info.range}`) : ""}`);
     }
     lines.push("");
   }

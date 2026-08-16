@@ -6,6 +6,41 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ---
 
+## [0.2.0] - 2026-08-16
+
+### Added
+
+- **Package Resolution System**: Nova now resolves latest compatible package versions from the npm registry instead of using stale hardcoded versions.
+  - Centralized `PackageResolver` used by `nova create`, `nova add`, and `nova upgrade`
+  - Three resolution strategies: `latest`, `compatible` (default), and `exact`
+  - Per-operation in-memory cache to avoid duplicate registry calls
+  - Graceful offline fallback to static versions from `FEATURE_CONTRIBUTIONS`
+  - Prerelease versions excluded by default
+- **`nova packages` command**: Inspect Nova-managed package versions with installed vs. latest comparison
+  - `nova packages --outdated` to show only packages with updates available
+  - `nova packages --json` for machine-readable output
+- **Enhanced `nova upgrade`**: Now resolves latest compatible versions from the registry
+  - Detects and displays incompatible major version changes
+  - Only applies safe updates within the same major version
+  - Shows detailed upgrade plan with version comparison
+- **Improved `nova remove`**: Base project dependencies (react, next, typescript, etc.) are now protected from accidental removal
+- **Post-installation verification**: Validates installed packages match resolved constraints
+- **Dry-run resolution**: `--dry-run` now shows resolved package versions with strategy metadata
+
+### Changed
+
+- `buildPackageJson()` now has a companion `buildPackageJsonResolved()` that resolves versions from the registry
+- `upgradeProject()` now queries the npm registry for latest compatible versions instead of syncing to static versions
+- `removePlugins()` now protects base project and UI library dependencies from removal
+- `ProjectOperationPlan` now includes `resolvedVersions` metadata for dry-run output
+
+### Dependencies
+
+- Added `semver` ^7.6.0 (direct dependency for version resolution)
+- Added `@types/semver` ^7.5.0 (dev dependency)
+
+---
+
 ## [0.1.9] - 2026-08-10
 
 ### Added
@@ -98,7 +133,8 @@ Baseline referenced by this changelog's `[Unreleased]` section. See git history 
 
 ---
 
-[Unreleased]: https://github.com/darka1pha/nova/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/darka1pha/nova/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/darka1pha/nova/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/darka1pha/nova/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/darka1pha/nova/compare/v0.1.6...v0.1.8
 [0.1.6]: https://github.com/darka1pha/nova/releases/tag/v0.1.6

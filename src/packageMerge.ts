@@ -1,5 +1,6 @@
 import fs from "fs-extra";
 import path from "node:path";
+import type { ResolvedPackage } from "./resolver/types.js";
 
 export interface PackageAdditions {
   dependencies?: Record<string, string>;
@@ -66,6 +67,50 @@ export function mergePackageAdditions(
     pkg.dependencies = sortKeys(dependencies);
     pkg.devDependencies = sortKeys(devDependencies);
     pkg.scripts = scripts;
+  }
+
+  return result;
+}
+
+/**
+ * Merges resolved packages into an existing project's package.json.
+ * Similar to `mergePackageAdditions` but works with `ResolvedPackage[]`
+ * from the resolver rather than static `PackageAdditions`.
+ */
+export function mergeResolvedPackages(
+  pkg: Record<string, unknown>,
+  resolved: ResolvedPackage[],
+  options: { dryRun?: boolean } = {},
+): MergePackageResult {
+  const result: MergePackageResult = {
+    addedDependencies: [],
+    addedDevDependencies: [],
+    addedScripts: [],
+    skippedScripts: [],
+  };
+
+  const dependencies = { ...((pkg.dependencies as Record<string, string> | undefined) ?? {}) };
+  const devDependencies = {
+    ...((pkg.devDependencies as Record<string, string> | undefined) ?? {}),
+  };
+
+  for (const resolvedPkg of resolved) {
+    if (resolvedPkg.dev) {
+      if (devDependencies[resolvedPkg.name] !== resolvedPkg.versionRange) {
+        result.addedDevDependencies.push(resolvedPkg.name);
+      }
+      devDependencies[resolvedPkg.name] = resolvedPkg.versionRange;
+    } else {
+      if (dependencies[resolvedPkg.name] !== resolvedPkg.versionRange) {
+        result.addedDependencies.push(resolvedPkg.name);
+      }
+      dependencies[resolvedPkg.name] = resolvedPkg.versionRange;
+    }
+  }
+
+  if (!options.dryRun) {
+    pkg.dependencies = sortKeys(dependencies);
+    pkg.devDependencies = sortKeys(devDependencies);
   }
 
   return result;

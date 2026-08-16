@@ -1,5 +1,8 @@
 import { FEATURE_CONTRIBUTIONS } from "./featureContributions.js";
 import type { Answers, FeatureKey } from "./types.js";
+import type { PackageResolver } from "./resolver/index.js";
+import { collectAllRequirements } from "./resolver/packageRequirements.js";
+import type { ResolvedPackage } from "./resolver/types.js";
 
 /**
  * Builds the generated project's package.json.
@@ -117,6 +120,58 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
     dependencies: sortKeys(dependencies),
     devDependencies: sortKeys(devDependencies),
   };
+}
+
+/**
+ * Builds the generated project's package.json with dynamically resolved
+ * package versions from the npm registry. Falls back to the static
+ * versions from `buildPackageJson()` when resolution fails for any
+ * individual package.
+ *
+ * Uses the same `FEATURE_CONTRIBUTIONS` single source of truth as
+ * `buildPackageJson()` — the resolver merely looks up the newest
+ * published version satisfying each declared range.
+ */
+export async function buildPackageJsonResolved(
+  answers: Pick<Answers, "projectName" | "features"> & Partial<Pick<Answers, "uiLibrary">>,
+  resolver: PackageResolver,
+): Promise<ReturnType<typeof buildPackageJson>> {
+  // Start with the static baseline — this ensures we never lose any
+  // dependency even if resolution fails across the board.
+  const baseline = buildPackageJson(answers);
+
+  // Collect all requirements from the same sources buildPackageJson uses
+  const requirements = collectAllRequirements(answers);
+
+  // Resolve all packages in one batch (the resolver deduplicates + caches)
+  const result = await resolver.resolvePackages(requirements);
+
+  // Log warnings for failed resolutions but don't abort — the baseline
+  // static version will remain in place for any unresolved package.
+  for (const failure of result.failed) {
+    resolver.warnings.push(
+      `Could not resolve "${failure.name}": ${failure.reason}. Using static fallback version.`,
+    );
+  }
+
+  // Apply resolved versions on top of the baseline
+  for (const pkg of result.resolved) {
+    if (pkg.dev) {
+      if (baseline.devDependencies[pkg.name] !== undefined) {
+        baseline.devDependencies[pkg.name] = pkg.versionRange;
+      }
+    } else {
+      if (baseline.dependencies[pkg.name] !== undefined) {
+        baseline.dependencies[pkg.name] = pkg.versionRange;
+      }
+    }
+  }
+
+  // Re-sort keys after applying resolved versions
+  baseline.dependencies = sortKeys(baseline.dependencies);
+  baseline.devDependencies = sortKeys(baseline.devDependencies);
+
+  return baseline;
 }
 
 function sortKeys<T extends Record<string, string>>(obj: T) {

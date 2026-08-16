@@ -24,7 +24,8 @@ import { executePlan, rollbackTargetDir, type OperationPlan } from "./operations
 import { patchAppProviders, patchMiddleware, patchNextConfig } from "./patchers/index.js";
 import { resolveTemplatesRoot } from "./templatesRoot.js";
 import { validatePluginSelection } from "./validators.js";
-import { buildPackageJson } from "../packageManifest.js";
+import { buildPackageJson, buildPackageJsonResolved } from "../packageManifest.js";
+import { PackageResolver } from "../resolver/index.js";
 import { isValidProjectName } from "../prompts.js";
 import { initializeProjectConfig } from "../project.js";
 import { generateMobileProject } from "./mobile.js";
@@ -117,6 +118,10 @@ export async function generateProject(
     throw new PluginValidationError(validationIssues);
   }
 
+  // Resolve package versions from the registry. Falls back to static
+  // versions from FEATURE_CONTRIBUTIONS when the registry is unreachable.
+  const resolver = new PackageResolver();
+
   await hooks.run("beforeGenerate", context);
   await runPluginHook("beforeGenerate", enabledPluginIds, pluginRegistry, pluginContext);
 
@@ -163,8 +168,21 @@ export async function generateProject(
       return { targetDir, pluginRegistry, pluginContext };
     }
 
+    logger.step("Resolving package versions");
+    let packageJson: ReturnType<typeof buildPackageJson>;
+    try {
+      packageJson = await buildPackageJsonResolved(answers, resolver);
+      if (resolver.warnings.length > 0) {
+        for (const warning of resolver.warnings) {
+          logger.warn(warning);
+        }
+      }
+    } catch {
+      logger.warn("Package version resolution failed. Using static fallback versions.");
+      packageJson = buildPackageJson(answers);
+    }
+
     logger.step("Writing package.json");
-    const packageJson = buildPackageJson(answers);
     await fs.writeJson(path.join(targetDir, "package.json"), packageJson, { spaces: 2 });
 
     logger.step("Patching configuration");
