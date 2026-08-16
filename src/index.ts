@@ -36,6 +36,7 @@ import {
   upgradeProject,
   validateProject,
 } from "./commands.js";
+import { inspectPackages } from "./commands/packages.js";
 
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -75,7 +76,7 @@ ${pc.bold("Usage")}
   nova add <feature...> [options]
   nova remove <plugin...> [--path <dir>] [--force]
   nova deploy [provider] [--path <dir>] [--dry-run] [--list]
-  nova status | info | doctor | validate | clean | diff | upgrade | repair [--path <dir>]
+  nova status | info | doctor | validate | clean | diff | upgrade | repair | packages [--path <dir>]
 
 ${pc.bold("Project Creation Options")}
   -t, --template <name>    Template to use: default, saas, ai, dashboard, api, react-native
@@ -754,20 +755,36 @@ async function runMaintenanceCommand(command: string, args: string[]) {
     const totalUpdates = result.updatedDependencies.length + result.updatedDevDependencies.length + result.addedScripts.length;
     if (json) {
       output(result);
-    } else if (!totalUpdates) {
-      p.log.success("Project dependencies and scripts are already up to date.");
     } else {
       const prefix = dryRun ? "[DRY RUN] Would update" : "Updated";
-      if (result.updatedDependencies.length) {
-        p.log.info(`${prefix} dependencies: ${result.updatedDependencies.map((d) => `${d.name} (${d.from ?? "missing"} -> ${d.to})`).join(", ")}`);
+      if (!totalUpdates && (!result.incompatible || !result.incompatible.length)) {
+        p.log.success("Project dependencies and scripts are already up to date.");
+      } else {
+        if (result.updatedDependencies.length) {
+          p.log.info(`${prefix} dependencies: ${result.updatedDependencies.map((d) => `${d.name} (${d.from ?? "missing"} -> ${d.to})`).join(", ")}`);
+        }
+        if (result.updatedDevDependencies.length) {
+          p.log.info(`${prefix} devDependencies: ${result.updatedDevDependencies.map((d) => `${d.name} (${d.from ?? "missing"} -> ${d.to})`).join(", ")}`);
+        }
+        if (result.addedScripts.length) {
+          p.log.info(`${prefix} scripts: ${result.addedScripts.map((s) => `${s.name} ("${s.command}")`).join(", ")}`);
+        }
+        if (!dryRun && totalUpdates > 0) p.log.success(`Upgrade completed (${totalUpdates} changes applied).`);
       }
-      if (result.updatedDevDependencies.length) {
-        p.log.info(`${prefix} devDependencies: ${result.updatedDevDependencies.map((d) => `${d.name} (${d.from ?? "missing"} -> ${d.to})`).join(", ")}`);
+
+      if (result.upToDate && result.upToDate.length > 0) {
+        p.log.info(`${result.upToDate.length} packages are already up-to-date.`);
       }
-      if (result.addedScripts.length) {
-        p.log.info(`${prefix} scripts: ${result.addedScripts.map((s) => `${s.name} ("${s.command}")`).join(", ")}`);
+
+      if (result.incompatible?.length) {
+        p.log.warn(`Incompatible packages skipped: ${result.incompatible.map((d) => `${d.name} (current is ${d.current}, latest is ${d.latest})`).join(", ")}`);
       }
-      if (!dryRun) p.log.success(`Upgrade completed (${totalUpdates} changes applied).`);
+
+      if (result.warnings?.length) {
+        for (const warn of result.warnings) {
+          p.log.warn(warn);
+        }
+      }
     }
     return;
   }
@@ -783,6 +800,43 @@ async function runMaintenanceCommand(command: string, args: string[]) {
       p.log.success(`${prefix} files: ${result.repairedFiles.join(", ")}`);
       if (result.restoredScripts.length) p.log.info(`Restored scripts: ${result.restoredScripts.join(", ")}`);
       if (result.restoredEnvKeys.length) p.log.info(`Restored environment keys: ${result.restoredEnvKeys.join(", ")}`);
+    }
+    return;
+  }
+
+  if (command === "packages") {
+    const outdatedOnly = args.includes("--outdated");
+    const result = await inspectPackages(targetDir, { outdatedOnly });
+
+    if (json) {
+      output(result);
+    } else {
+      // Format as table
+      const statusSymbol = (s: string) => {
+        switch (s) {
+          case "up-to-date": return pc.green("✓");
+          case "update-available": return pc.yellow("↑");
+          case "incompatible": return pc.red("⚠");
+          case "not-found": return pc.dim("?");
+          default: return pc.dim("-");
+        }
+      };
+      console.log(pc.bold("\nNova Packages\n"));
+      console.log(pc.bold("Package".padEnd(40)) + pc.bold("Installed".padEnd(15)) + pc.bold("Latest".padEnd(15)) + pc.bold("Status"));
+      console.log("─".repeat(85));
+      for (const pkg of result.packages) {
+        const name = pkg.name.padEnd(40);
+        const installed = (pkg.installed ?? "n/a").padEnd(15);
+        const latest = (pkg.latest ?? "n/a").padEnd(15);
+        console.log(`${name}${installed}${latest}${statusSymbol(pkg.status)} ${pkg.status}`);
+      }
+      if (result.errors.length > 0) {
+        console.log(pc.yellow("\nWarnings:"));
+        for (const err of result.errors) {
+          console.log(pc.yellow(`  ${err}`));
+        }
+      }
+      console.log();
     }
     return;
   }
@@ -901,7 +955,7 @@ export async function run() {
     return;
   }
 
-  if (["init", "info", "status", "doctor", "validate", "clean", "diff", "remove", "list", "search", "upgrade", "repair"].includes(first ?? "")) {
+  if (["init", "info", "status", "doctor", "validate", "clean", "diff", "remove", "list", "search", "upgrade", "repair", "packages"].includes(first ?? "")) {
     try {
       await runMaintenanceCommand(first, rawArgs.slice(1));
     } catch (error) {

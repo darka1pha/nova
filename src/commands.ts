@@ -1,5 +1,6 @@
 import fs from "fs-extra";
 import path from "node:path";
+import semver from "semver";
 
 import { getPluginInfo, listAllPluginInfo } from "./generator/pluginInfo.js";
 import { getPluginRegistry } from "./plugin/legacyAdapter.js";
@@ -17,6 +18,9 @@ import {
 import type { FeatureKey, PackageManager, UiLibrary } from "./types.js";
 import { getPackageManagerVersion, LOCKFILES } from "./utils/packageManager.js";
 import { ProjectTransaction } from "./utils/transaction.js";
+import { PackageResolver } from "./resolver/index.js";
+import { collectFeatureRequirements, getBaseDependencyNames } from "./resolver/packageRequirements.js";
+import { buildPackageJson } from "./packageManifest.js";
 
 export interface ProjectCommandArgs {
   targetDir: string;
@@ -611,14 +615,17 @@ export interface UpgradeOptions {
 }
 
 export interface UpgradeResult {
-  updatedDependencies: Array<{ name: string; from?: string; to: string }>;
-  updatedDevDependencies: Array<{ name: string; from?: string; to: string }>;
+  updatedDependencies: Array<{ name: string; from?: string; to: string; strategy?: string }>;
+  updatedDevDependencies: Array<{ name: string; from?: string; to: string; strategy?: string }>;
   addedScripts: Array<{ name: string; command: string }>;
+  incompatible: Array<{ name: string; current: string; latest: string; reason: string }>;
+  upToDate: Array<{ name: string; version: string }>;
   manualReview: string[];
   dryRun: boolean;
+  warnings: string[];
 }
 
-/** Reconciles dependency declarations with installed plugin manifests without overwriting user source files. */
+/** Reconciles dependency declarations with installed plugin manifests, resolving latest compatible versions from the registry. */
 export async function upgradeProject(targetDir: string, options: UpgradeOptions = {}): Promise<UpgradeResult> {
   const { dryRun = false, plugins: requestedPlugins } = options;
   const { pkg, config } = await getProject(targetDir);
@@ -628,30 +635,165 @@ export async function upgradeProject(targetDir: string, options: UpgradeOptions 
   const devDependencies = ((pkg.devDependencies as Record<string, string> | undefined) ?? (pkg.devDependencies = {} as Record<string, string>));
   const scripts = ((pkg.scripts as Record<string, string> | undefined) ?? (pkg.scripts = {} as Record<string, string>));
 
-  const updatedDependencies: Array<{ name: string; from?: string; to: string }> = [];
-  const updatedDevDependencies: Array<{ name: string; from?: string; to: string }> = [];
+  const updatedDependencies: Array<{ name: string; from?: string; to: string; strategy?: string }> = [];
+  const updatedDevDependencies: Array<{ name: string; from?: string; to: string; strategy?: string }> = [];
   const addedScripts: Array<{ name: string; command: string }> = [];
+  const incompatible: Array<{ name: string; current: string; latest: string; reason: string }> = [];
+  const upToDate: Array<{ name: string; version: string }> = [];
   const manualReview: string[] = [];
+  const warnings: string[] = [];
 
   const targetPlugins = requestedPlugins && requestedPlugins.length > 0
     ? config.plugins.filter((p) => requestedPlugins.includes(p))
     : config.plugins;
 
+  // Collect all requirements from target plugins and resolve from registry
+  const requirements = collectFeatureRequirements(targetPlugins as FeatureKey[]);
+  const resolver = new PackageResolver();
+  let resolvedMap = new Map<string, { version: string; range: string; strategy: string }>();
+
+  try {
+    const result = await resolver.resolvePackages(requirements);
+    for (const r of result.resolved) {
+      resolvedMap.set(r.name, { version: r.version, range: r.versionRange, strategy: r.strategy });
+    }
+    for (const f of result.failed) {
+      warnings.push(`Could not resolve "${f.name}": ${f.reason}. Skipping.`);
+    }
+  } catch (error) {
+    warnings.push(`Package resolution failed: ${error instanceof Error ? error.message : String(error)}. Falling back to static versions.`);
+    // Fall back to static version comparison (original behavior)
+    for (const id of targetPlugins) {
+      const plugin = registry.getPlugin(id);
+      if (!plugin) continue;
+      for (const [name, version] of Object.entries(plugin.dependencies ?? {})) {
+        if (dependencies[name] !== version) {
+          updatedDependencies.push({ name, from: dependencies[name], to: version });
+          if (!dryRun) dependencies[name] = version;
+        }
+      }
+      for (const [name, version] of Object.entries(plugin.devDependencies ?? {})) {
+        if (devDependencies[name] !== version) {
+          updatedDevDependencies.push({ name, from: devDependencies[name], to: version });
+          if (!dryRun) devDependencies[name] = version;
+        }
+      }
+      for (const [name, cmd] of Object.entries(plugin.scripts ?? {})) {
+        if (!scripts[name]) {
+          addedScripts.push({ name, command: cmd });
+          if (!dryRun) scripts[name] = cmd;
+        }
+      }
+    }
+
+    if (!dryRun && (updatedDependencies.length || updatedDevDependencies.length || addedScripts.length)) {
+      const transaction = new ProjectTransaction(targetDir);
+      transaction.begin();
+      try {
+        await transaction.snapshotFile("package.json");
+        await transaction.snapshotFile(".nova/project.json");
+        await transaction.snapshotFile(".nova.json");
+        await fs.writeJson(path.join(targetDir, "package.json"), pkg, { spaces: 2 });
+        await writeProjectConfig(targetDir, config);
+        transaction.commit();
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
+      }
+    }
+
+    return { updatedDependencies, updatedDevDependencies, addedScripts, incompatible, upToDate, manualReview, dryRun, warnings };
+  }
+
+  // Use resolved versions for upgrade decisions
   for (const id of targetPlugins) {
     const plugin = registry.getPlugin(id);
     if (!plugin) continue;
 
-    for (const [name, version] of Object.entries(plugin.dependencies ?? {})) {
-      if (dependencies[name] !== version) {
-        updatedDependencies.push({ name, from: dependencies[name], to: version });
-        if (!dryRun) dependencies[name] = version;
+    for (const [name, declaredRange] of Object.entries(plugin.dependencies ?? {})) {
+      const currentVersion = dependencies[name];
+      const resolved = resolvedMap.get(name);
+
+      if (!resolved) continue;
+
+      if (!currentVersion) {
+        // New dependency not yet installed
+        updatedDependencies.push({ name, to: resolved.range, strategy: resolved.strategy });
+        if (!dryRun) dependencies[name] = resolved.range;
+        continue;
+      }
+
+      const currentClean = semver.minVersion(currentVersion)?.version;
+      if (!currentClean) {
+        updatedDependencies.push({ name, from: currentVersion, to: resolved.range, strategy: resolved.strategy });
+        if (!dryRun) dependencies[name] = resolved.range;
+        continue;
+      }
+
+      if (semver.eq(currentClean, resolved.version)) {
+        upToDate.push({ name, version: currentClean });
+        continue;
+      }
+
+      // Check for incompatible major version changes
+      if (semver.major(currentClean) !== semver.major(resolved.version)) {
+        incompatible.push({
+          name,
+          current: currentClean,
+          latest: resolved.version,
+          reason: `Major version change (${semver.major(currentClean)} → ${semver.major(resolved.version)}). Manual upgrade required.`,
+        });
+        continue;
+      }
+
+      // Safe update within same major
+      if (semver.lt(currentClean, resolved.version)) {
+        updatedDependencies.push({ name, from: currentVersion, to: resolved.range, strategy: resolved.strategy });
+        if (!dryRun) dependencies[name] = resolved.range;
+      } else {
+        upToDate.push({ name, version: currentClean });
       }
     }
 
-    for (const [name, version] of Object.entries(plugin.devDependencies ?? {})) {
-      if (devDependencies[name] !== version) {
-        updatedDevDependencies.push({ name, from: devDependencies[name], to: version });
-        if (!dryRun) devDependencies[name] = version;
+    for (const [name, declaredRange] of Object.entries(plugin.devDependencies ?? {})) {
+      const currentVersion = devDependencies[name];
+      const resolved = resolvedMap.get(name);
+
+      if (!resolved) continue;
+
+      if (!currentVersion) {
+        updatedDevDependencies.push({ name, to: resolved.range, strategy: resolved.strategy });
+        if (!dryRun) devDependencies[name] = resolved.range;
+        continue;
+      }
+
+      const currentClean = semver.minVersion(currentVersion)?.version;
+      if (!currentClean) {
+        updatedDevDependencies.push({ name, from: currentVersion, to: resolved.range, strategy: resolved.strategy });
+        if (!dryRun) devDependencies[name] = resolved.range;
+        continue;
+      }
+
+      if (semver.eq(currentClean, resolved.version)) {
+        upToDate.push({ name, version: currentClean });
+        continue;
+      }
+
+      if (semver.major(currentClean) !== semver.major(resolved.version)) {
+        incompatible.push({
+          name,
+          current: currentClean,
+          latest: resolved.version,
+          reason: `Major version change (${semver.major(currentClean)} → ${semver.major(resolved.version)}). Manual upgrade required.`,
+        });
+        continue;
+      }
+
+      if (semver.lt(currentClean, resolved.version)) {
+        updatedDevDependencies.push({ name, from: currentVersion, to: resolved.range, strategy: resolved.strategy });
+        if (!dryRun) devDependencies[name] = resolved.range;
+      } else {
+        upToDate.push({ name, version: currentClean });
       }
     }
 
@@ -686,8 +828,11 @@ export async function upgradeProject(targetDir: string, options: UpgradeOptions 
     updatedDependencies,
     updatedDevDependencies,
     addedScripts,
+    incompatible,
+    upToDate,
     manualReview,
     dryRun,
+    warnings,
   };
 }
 
@@ -838,9 +983,18 @@ export async function removePlugins(
   const remaining = config.plugins.filter((plugin) => !removed.includes(plugin));
 
   // Clean dependencies and scripts that are not required by any remaining plugin
+  // Also protect base project dependencies (react, next, typescript, etc.)
+  const uiLibrary = (config.uiLibrary ?? "shadcn") as UiLibrary;
+  const baseDeps = getBaseDependencyNames(uiLibrary);
   const remainingDependencies = new Set<string>();
   const remainingDevDependencies = new Set<string>();
   const remainingScripts = new Set<string>();
+
+  // Base project deps are always protected
+  for (const name of baseDeps) {
+    remainingDependencies.add(name);
+    remainingDevDependencies.add(name);
+  }
 
   for (const p of remaining) {
     const manifest = registry.getPlugin(p);

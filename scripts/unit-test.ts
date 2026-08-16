@@ -460,7 +460,67 @@ try {
   await fs.remove(statusTmpDir).catch(() => {});
 }
 
-console.log("\n=========================================");
-console.log("   ALL PHASE 2 & PHASE 3 UNIT TESTS PASSED (100%)  ");
-console.log("=========================================\n");
+// ── Package Resolution Tests ──────────────────────────────────────
 
+import { collectBaseRequirements, collectFeatureRequirements, getBaseDependencyNames } from "../src/resolver/packageRequirements.js";
+import { isValidPackageName } from "../src/resolver/registryClient.js";
+import { PackageResolver } from "../src/resolver/index.js";
+
+// 1. Package requirements collection
+const baseReqs = collectBaseRequirements("shadcn");
+assert.ok(baseReqs.length > 10, `Expected >10 base requirements, got ${baseReqs.length}`);
+const nextReq = baseReqs.find(r => r.name === "next");
+assert.ok(nextReq, "Base requirements must include 'next'");
+assert.equal(nextReq.strategy, "compatible");
+assert.ok(nextReq.range?.startsWith("^"), "next range should start with ^");
+console.log("✓ collectBaseRequirements returns valid base deps");
+
+// 2. Feature requirements collection
+const drizzleReqs = collectFeatureRequirements(["drizzle"]);
+assert.ok(drizzleReqs.length > 0, "Drizzle should have requirements");
+const drizzleOrm = drizzleReqs.find(r => r.name === "drizzle-orm");
+assert.ok(drizzleOrm, "Should include drizzle-orm");
+assert.equal(drizzleOrm.strategy, "compatible");
+console.log("✓ collectFeatureRequirements returns valid feature deps");
+
+// 3. Empty feature requirements
+const dockerReqs = collectFeatureRequirements(["docker"]);
+assert.equal(dockerReqs.length, 0, "Docker should have no package deps");
+console.log("✓ Features with no deps return empty requirements");
+
+// 4. Base dependency names set
+const baseDeps = getBaseDependencyNames("shadcn");
+assert.ok(baseDeps.has("react"), "Base deps must include react");
+assert.ok(baseDeps.has("next"), "Base deps must include next");
+assert.ok(baseDeps.has("typescript"), "Base deps must include typescript");
+console.log("✓ getBaseDependencyNames returns correct base dep set");
+
+// 5. Package name validation
+assert.ok(isValidPackageName("react"), "'react' should be valid");
+assert.ok(isValidPackageName("@types/react"), "'@types/react' should be valid");
+assert.ok(isValidPackageName("drizzle-orm"), "'drizzle-orm' should be valid");
+assert.ok(!isValidPackageName(""), "Empty name should be invalid");
+assert.ok(!isValidPackageName("../evil"), "Path traversal should be invalid");
+console.log("✓ Package name validation works correctly");
+
+// 6. Offline resolver
+const offlineResolver = new PackageResolver({ offline: true });
+const offlineResult = await offlineResolver.resolveCompatible("react", "^19.0.0");
+assert.equal(offlineResult.name, "react");
+assert.equal(offlineResult.strategy, "compatible");
+assert.equal(offlineResult.versionRange, "^19.0.0");
+console.log("✓ Offline resolver returns valid fallback");
+
+// 7. Batch resolve deduplication
+const batchResult = await offlineResolver.resolvePackages([
+  { name: "react", strategy: "compatible", range: "^19.0.0" },
+  { name: "react", strategy: "compatible", range: "^19.0.0" },
+  { name: "next", strategy: "compatible", range: "^15.1.0" },
+]);
+assert.equal(batchResult.resolved.length, 3);
+assert.equal(batchResult.failed.length, 0);
+console.log("✓ Batch resolve handles duplicates");
+
+console.log("\n=========================================");
+console.log("   ALL PHASE 2, PHASE 3 & RESOLVER TESTS PASSED (100%)  ");
+console.log("=========================================\n");

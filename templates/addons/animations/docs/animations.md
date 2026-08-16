@@ -1,6 +1,6 @@
 # Animations & Motion Plugin
 
-This addon adds Framer Motion integration with pre-built animation presets and variants.
+This addon adds Motion (formerly Framer Motion) integration with pre-built animation presets and variants.
 
 ## Features
 
@@ -17,7 +17,7 @@ This addon adds Framer Motion integration with pre-built animation presets and v
 ### Basic Fade Animation
 
 ```tsx
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { fadeInVariants } from "@/lib/animations";
 
 export function FadingElement() {
@@ -37,19 +37,19 @@ export function FadingElement() {
 ### Slide Up Animation
 
 ```tsx
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { slideInUpVariants } from "@/lib/animations";
 
 export function SlidingCard() {
   return (
-    <motion.card
+    <motion.div
       variants={slideInUpVariants}
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true }}
     >
       Card slides up into view
-    </motion.card>
+    </motion.div>
   );
 }
 ```
@@ -57,7 +57,7 @@ export function SlidingCard() {
 ### Staggered List Animation
 
 ```tsx
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { listContainerVariants, listItemVariants } from "@/lib/animations";
 
 export function AnimatedList() {
@@ -83,7 +83,7 @@ export function AnimatedList() {
 ### Modal Animation
 
 ```tsx
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { modalBackdropVariants, modalContentVariants } from "@/lib/animations";
 
 export function Modal({ isOpen, onClose }) {
@@ -173,6 +173,6 @@ const variants = prefersReducedMotion ? { hidden: {}, visible: {} } : fadeInVari
 
 ## Resources
 
-- [Framer Motion Docs](https://www.framer.com/motion/)
-- [Motion Component API](https://www.framer.com/docs/motion/api-motion-component/)
-- [Variants & Transitions](https://www.framer.com/docs/motion/transitions/)
+- [Motion Documentation](https://motion.dev/)
+- [Motion Component API](https://motion.dev/docs/react-motion-component)
+- [Variants & Transitions](https://motion.dev/docs/react-transitions)

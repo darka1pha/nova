@@ -5,7 +5,9 @@ import type { PackageManager } from "@nova/core";
 
 import { ADDON_FOLDERS, resolveFeatureKey } from "./addonRegistry.js";
 import { ADDONS_DIR } from "./generator/index.js";
-import { mergePackageAdditions, readPackageJson, writePackageJson } from "./packageMerge.js";
+import { mergePackageAdditions, mergeResolvedPackages, readPackageJson, writePackageJson } from "./packageMerge.js";
+import { PackageResolver } from "./resolver/index.js";
+import { collectFeatureRequirements } from "./resolver/packageRequirements.js";
 import { appendPluginEnvContributions } from "./plugin/applyEnv.js";
 import { writePluginDocs } from "./plugin/applyDocs.js";
 import { applyPluginPatches } from "./plugin/applyPatches.js";
@@ -221,6 +223,21 @@ export async function addFeaturesToProject(
     answers: pluginAnswers,
   };
 
+  // Resolve package versions from registry
+  const resolver = new PackageResolver();
+  const featureRequirements = collectFeatureRequirements(orderedFeatures);
+  let resolvedResult: import("./resolver/types.js").PackageResolutionResult | undefined;
+  try {
+    resolvedResult = await resolver.resolvePackages(featureRequirements);
+    for (const failure of resolvedResult.failed) {
+      resolver.warnings.push(
+        `Could not resolve "${failure.name}": ${failure.reason}. Using static fallback version.`,
+      );
+    }
+  } catch {
+    // Resolution failed entirely — will fall back to static versions
+  }
+
   onStep?.("Validating plugin selection");
   const validationIssues = validatePlugins(orderedFeatures, registry, pluginContext);
   if (validationIssues.length > 0) {
@@ -263,14 +280,38 @@ export async function addFeaturesToProject(
         plan.filesCreated.push(...copyResult.written);
       }
 
-      const mergeResult = mergePackageAdditions(pkg, {
-        dependencies: plugin?.dependencies,
-        devDependencies: plugin?.devDependencies,
+      // Use resolved versions if available, otherwise fall back to static
+      const featureResolved = resolvedResult?.resolved.filter((r) =>
+        Object.keys(plugin?.dependencies ?? {}).includes(r.name) ||
+        Object.keys(plugin?.devDependencies ?? {}).includes(r.name)
+      );
+      let mergeResult;
+      if (featureResolved && featureResolved.length > 0) {
+        mergeResult = mergeResolvedPackages(pkg, featureResolved, { dryRun: true });
+      } else {
+        mergeResult = mergePackageAdditions(pkg, {
+          dependencies: plugin?.dependencies,
+          devDependencies: plugin?.devDependencies,
+          scripts: plugin?.scripts,
+        }, { dryRun: true });
+      }
+      // Always merge scripts (not handled by mergeResolvedPackages)
+      const scriptsMerge = mergePackageAdditions(pkg, {
         scripts: plugin?.scripts,
       }, { dryRun: true });
 
-      Object.assign(plan.dependenciesAdded, plugin?.dependencies ?? {});
-      Object.assign(plan.devDependenciesAdded, plugin?.devDependencies ?? {});
+      // Populate plan with resolved versions when available
+      const resolvedDeps: Record<string, string> = {};
+      const resolvedDevDeps: Record<string, string> = {};
+      for (const r of featureResolved ?? []) {
+        if (r.dev) {
+          resolvedDevDeps[r.name] = r.versionRange;
+        } else {
+          resolvedDeps[r.name] = r.versionRange;
+        }
+      }
+      Object.assign(plan.dependenciesAdded, Object.keys(resolvedDeps).length > 0 ? resolvedDeps : (plugin?.dependencies ?? {}));
+      Object.assign(plan.devDependenciesAdded, Object.keys(resolvedDevDeps).length > 0 ? resolvedDevDeps : (plugin?.devDependencies ?? {}));
       Object.assign(plan.scriptsAdded, plugin?.scripts ?? {});
 
       const envKeys: string[] = [];
@@ -389,11 +430,25 @@ export async function addFeaturesToProject(
     for (const feature of orderedFeatures) {
       onStep?.(`Merging package.json for ${feature}`);
       const plugin = registry.getPlugin(feature);
-      const mergeResult = mergePackageAdditions(pkg, {
-        dependencies: plugin?.dependencies,
-        devDependencies: plugin?.devDependencies,
-        scripts: plugin?.scripts,
-      });
+      // Use resolved versions if available, fall back to static
+      const featureResolved = resolvedResult?.resolved.filter((r) =>
+        Object.keys(plugin?.dependencies ?? {}).includes(r.name) ||
+        Object.keys(plugin?.devDependencies ?? {}).includes(r.name)
+      );
+      let mergeResult;
+      if (featureResolved && featureResolved.length > 0) {
+        mergeResult = mergeResolvedPackages(pkg, featureResolved);
+        // Also merge scripts (not handled by mergeResolvedPackages)
+        const scriptsMerge = mergePackageAdditions(pkg, { scripts: plugin?.scripts });
+        mergeResult.addedScripts = scriptsMerge.addedScripts;
+        mergeResult.skippedScripts = scriptsMerge.skippedScripts;
+      } else {
+        mergeResult = mergePackageAdditions(pkg, {
+          dependencies: plugin?.dependencies,
+          devDependencies: plugin?.devDependencies,
+          scripts: plugin?.scripts,
+        });
+      }
 
       onStep?.(`Merging environment variables for ${feature}`);
       const envResult = await appendPluginEnvContributions(targetDir, [feature], registry);

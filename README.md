@@ -432,6 +432,42 @@ Nova stores its authoritative project state under `.nova/project.json` (and keep
 }
 ```
 
+## Package Management
+
+### Package Version Resolution
+
+Nova resolves package versions dynamically from the npm registry to ensure your projects always get the latest compatible versions.
+
+#### Resolution Strategies
+
+| Strategy | Description | Example |
+|----------|-------------|--------|
+| `compatible` (default) | Newest version satisfying the declared semver range | `^15.1.0` → resolves to `15.3.2` |
+| `latest` | Newest stable published version | Resolves to whatever `dist-tags.latest` is |
+| `exact` | Validates that exactly the requested version exists | `1.2.3` → must exist on registry |
+
+#### Offline Behavior
+
+When the npm registry is unreachable (no internet, CI without network access), Nova falls back to the static versions declared in `FEATURE_CONTRIBUTIONS` with a warning. Projects can always be generated, even offline.
+
+#### `nova packages`
+
+Inspect Nova-managed package versions:
+
+```bash
+nova packages              # Show all managed packages
+nova packages --outdated   # Show only outdated packages  
+nova packages --json       # Machine-readable JSON output
+```
+
+#### Enhanced `nova upgrade`
+
+`nova upgrade` now resolves latest compatible versions from the registry:
+
+- Only applies safe updates within the same major version
+- Flags incompatible major version changes as warnings
+- Supports `--dry-run` to preview changes without modifying files
+
 ---
 
 ## Project Maintenance

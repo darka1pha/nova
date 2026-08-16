@@ -98,6 +98,20 @@ const pkg = await fs.readJson(path.join(result.targetDir, "package.json"));
 console.log("scripts:", Object.keys(pkg.scripts));
 console.log("lint-staged present:", Boolean(pkg["lint-staged"]));
 
+// Verify package version resolution integrity: real semver ranges, never literal "latest"
+for (const [depName, version] of Object.entries(pkg.dependencies ?? {})) {
+  if (version === "latest") {
+    console.error(`ERROR: Dependency "${depName}" is literally "latest" instead of resolved semver range!`);
+    process.exit(1);
+  }
+}
+for (const [depName, version] of Object.entries(pkg.devDependencies ?? {})) {
+  if (version === "latest") {
+    console.error(`ERROR: Dev dependency "${depName}" is literally "latest" instead of resolved semver range!`);
+    process.exit(1);
+  }
+}
+
 const novaConfig = await fs.readJson(path.join(result.targetDir, ".nova.json"));
 if (novaConfig.packageManager !== fullAnswers.packageManager || !novaConfig.plugins.includes("prisma")) {
   console.error("INVALID NOVA PROJECT METADATA", novaConfig);

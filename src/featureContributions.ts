@@ -148,7 +148,7 @@ export const FEATURE_CONTRIBUTIONS: Record<FeatureKey, PackageAdditions> = {
   designSystem: {},
   strapi: {},
   animations: {
-    dependencies: { "framer-motion": "^11.3.0" },
+    dependencies: { motion: "^13.1.0" },
   },
   tanstackTable: {
     dependencies: { "@tanstack/react-table": "^8.20.5" },

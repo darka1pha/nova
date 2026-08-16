@@ -52,11 +52,13 @@
     "@clack/prompts": "^0.8.2",
     "execa": "^9.5.1",
     "fs-extra": "^11.2.0",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "semver": "^7.8.5"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.10.2",
+    "@types/semver": "^7.8.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
