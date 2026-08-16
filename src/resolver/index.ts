@@ -256,17 +256,17 @@ export class PackageResolver {
 
   /**
    * Returns a sensible version range string that preserves the prefix style
-   * of the original range. For example:
-   *   "^15.1.0" + resolved "15.3.2" → "^15.1.0" (keep original — it already covers 15.3.2)
-   *   "~3.4.0" + resolved "3.4.8" → "~3.4.0" (keep original — it already covers 3.4.8)
+   * of the original range while pinning to the resolved version. For example:
+   *   "^15.1.0" + resolved "16.3.1" → "^16.3.1"
+   *   "~3.4.0" + resolved "3.4.8" → "~3.4.8"
    */
   private buildVersionRange(originalRange: string, resolvedVersion: string): string {
-    // If the resolved version satisfies the original range, keep the original
-    // range as-is. This preserves the user/plugin's expressed compatibility intent.
-    if (semver.satisfies(resolvedVersion, originalRange)) {
-      return originalRange;
+    if (originalRange.startsWith("~")) {
+      return `~${resolvedVersion}`;
     }
-    // Otherwise (shouldn't happen in normal flow), build a new caret range.
+    if (originalRange.startsWith(">=")) {
+      return `>=${resolvedVersion}`;
+    }
     return `^${resolvedVersion}`;
   }
 

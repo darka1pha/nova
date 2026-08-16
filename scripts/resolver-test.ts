@@ -36,7 +36,7 @@ async function main() {
     assert.ok(reqs.length > 10, `Expected >10 base requirements, got ${reqs.length}`);
     const nextReq = reqs.find(r => r.name === "next");
     assert.ok(nextReq, "Should include 'next' package");
-    assert.strictEqual(nextReq.strategy, "compatible");
+    assert.strictEqual(nextReq.strategy, "latest");
     assert.ok(nextReq.range?.startsWith("^"), "next range should start with ^");
   });
 
@@ -53,7 +53,7 @@ async function main() {
     assert.ok(reqs.length > 0, "Drizzle should have requirements");
     const drizzleOrm = reqs.find(r => r.name === "drizzle-orm");
     assert.ok(drizzleOrm, "Should include drizzle-orm");
-    assert.strictEqual(drizzleOrm.strategy, "compatible");
+    assert.strictEqual(drizzleOrm.strategy, "latest");
   });
 
   await test("collectFeatureRequirements handles features with no deps", async () => {

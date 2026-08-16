@@ -471,7 +471,7 @@ const baseReqs = collectBaseRequirements("shadcn");
 assert.ok(baseReqs.length > 10, `Expected >10 base requirements, got ${baseReqs.length}`);
 const nextReq = baseReqs.find(r => r.name === "next");
 assert.ok(nextReq, "Base requirements must include 'next'");
-assert.equal(nextReq.strategy, "compatible");
+assert.equal(nextReq.strategy, "latest");
 assert.ok(nextReq.range?.startsWith("^"), "next range should start with ^");
 console.log("✓ collectBaseRequirements returns valid base deps");
 
@@ -480,7 +480,7 @@ const drizzleReqs = collectFeatureRequirements(["drizzle"]);
 assert.ok(drizzleReqs.length > 0, "Drizzle should have requirements");
 const drizzleOrm = drizzleReqs.find(r => r.name === "drizzle-orm");
 assert.ok(drizzleOrm, "Should include drizzle-orm");
-assert.equal(drizzleOrm.strategy, "compatible");
+assert.equal(drizzleOrm.strategy, "latest");
 console.log("✓ collectFeatureRequirements returns valid feature deps");
 
 // 3. Empty feature requirements

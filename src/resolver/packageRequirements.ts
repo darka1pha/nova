@@ -11,39 +11,52 @@
 
 import { FEATURE_CONTRIBUTIONS } from "../featureContributions.js";
 import type { Answers, FeatureKey, UiLibrary } from "../types.js";
-import type { PackageRequirement } from "./types.js";
+import type { PackageRequirement, PackageResolutionStrategy } from "./types.js";
 
 /**
  * Converts a version string from FEATURE_CONTRIBUTIONS (e.g. "^0.36.4")
  * into a PackageRequirement with the appropriate strategy.
  *
- * - Ranges (^, ~, >=, etc.) → strategy: "compatible", range: the string
- * - Exact versions ("1.2.3") → strategy: "exact", version: the string
- * - "latest" or "*" → strategy: "latest"
+ * - Defaults to "latest" so project creation and additions install the latest
+ *   stable releases published on npm (e.g. Next.js 16.3.1, React 19, etc.).
+ * - "compatible" resolves the newest version satisfying the declared range.
+ * - "exact" validates that the exact version exists.
  */
-function versionToRequirement(name: string, versionSpec: string, dev: boolean): PackageRequirement {
+function versionToRequirement(
+  name: string,
+  versionSpec: string,
+  dev: boolean,
+  defaultStrategy: PackageResolutionStrategy = "latest",
+): PackageRequirement {
   const trimmed = versionSpec.trim();
 
   if (trimmed === "latest" || trimmed === "*") {
     return { name, strategy: "latest", dev };
   }
 
-  // If it starts with ^, ~, >=, >, <=, <, or contains ||, treat as range
-  if (/^[\^~><=]|\|\|/.test(trimmed)) {
-    return { name, strategy: "compatible", range: trimmed, dev };
+  // Exact versions ("1.2.3") without range prefixes
+  if (/^\d+\.\d+\.\d+/.test(trimmed) && !/^[\^~><=]|\|\|/.test(trimmed)) {
+    return { name, strategy: "exact", version: trimmed, dev };
   }
 
-  // If it's a plain semver version, treat as exact
-  // But in practice, FEATURE_CONTRIBUTIONS always uses ^ ranges,
-  // so this rarely triggers. Treat plain versions as compatible with ^ prefix.
-  return { name, strategy: "compatible", range: `^${trimmed}`, dev };
+  const range = /^[\^~><=]|\|\|/.test(trimmed) ? trimmed : `^${trimmed}`;
+
+  return {
+    name,
+    strategy: defaultStrategy,
+    range,
+    dev,
+  };
 }
 
 /**
  * Returns base project dependencies as PackageRequirements.
  * These are the always-present deps from buildPackageJson() in packageManifest.ts.
  */
-export function collectBaseRequirements(uiLibrary: UiLibrary = "shadcn"): PackageRequirement[] {
+export function collectBaseRequirements(
+  uiLibrary: UiLibrary = "shadcn",
+  strategy: PackageResolutionStrategy = "latest",
+): PackageRequirement[] {
   const requirements: PackageRequirement[] = [];
 
   // Base dependencies (always present)
@@ -68,7 +81,7 @@ export function collectBaseRequirements(uiLibrary: UiLibrary = "shadcn"): Packag
   };
 
   for (const [name, version] of Object.entries(baseDeps)) {
-    requirements.push(versionToRequirement(name, version, false));
+    requirements.push(versionToRequirement(name, version, false, strategy));
   }
 
   // Base devDependencies (always present)
@@ -93,7 +106,7 @@ export function collectBaseRequirements(uiLibrary: UiLibrary = "shadcn"): Packag
   };
 
   for (const [name, version] of Object.entries(baseDevDeps)) {
-    requirements.push(versionToRequirement(name, version, true));
+    requirements.push(versionToRequirement(name, version, true, strategy));
   }
 
   // UI library dependencies
@@ -126,7 +139,7 @@ export function collectBaseRequirements(uiLibrary: UiLibrary = "shadcn"): Packag
   if (uiLibDeps) {
     const isDev = uiLibrary === "daisy"; // daisyui is a devDependency
     for (const [name, version] of Object.entries(uiLibDeps)) {
-      requirements.push(versionToRequirement(name, version, isDev));
+      requirements.push(versionToRequirement(name, version, isDev, strategy));
     }
   }
 
@@ -137,7 +150,10 @@ export function collectBaseRequirements(uiLibrary: UiLibrary = "shadcn"): Packag
  * Converts FEATURE_CONTRIBUTIONS entries for the given features into
  * PackageRequirements.
  */
-export function collectFeatureRequirements(features: FeatureKey[]): PackageRequirement[] {
+export function collectFeatureRequirements(
+  features: FeatureKey[],
+  strategy: PackageResolutionStrategy = "latest",
+): PackageRequirement[] {
   const requirements: PackageRequirement[] = [];
 
   for (const feature of features) {
@@ -145,11 +161,11 @@ export function collectFeatureRequirements(features: FeatureKey[]): PackageRequi
     if (!contribution) continue;
 
     for (const [name, version] of Object.entries(contribution.dependencies ?? {})) {
-      requirements.push(versionToRequirement(name, version, false));
+      requirements.push(versionToRequirement(name, version, false, strategy));
     }
 
     for (const [name, version] of Object.entries(contribution.devDependencies ?? {})) {
-      requirements.push(versionToRequirement(name, version, true));
+      requirements.push(versionToRequirement(name, version, true, strategy));
     }
   }
 
@@ -160,14 +176,17 @@ export function collectFeatureRequirements(features: FeatureKey[]): PackageRequi
  * Collects all PackageRequirements for a full project generation:
  * base deps + UI lib deps + all enabled feature deps.
  */
-export function collectAllRequirements(answers: Pick<Answers, "features"> & Partial<Pick<Answers, "uiLibrary">>): PackageRequirement[] {
+export function collectAllRequirements(
+  answers: Pick<Answers, "features"> & Partial<Pick<Answers, "uiLibrary">>,
+  strategy: PackageResolutionStrategy = "latest",
+): PackageRequirement[] {
   const enabledFeatures = (Object.entries(answers.features) as [FeatureKey, boolean][])
     .filter(([, enabled]) => enabled)
     .map(([key]) => key);
 
   return [
-    ...collectBaseRequirements(answers.uiLibrary),
-    ...collectFeatureRequirements(enabledFeatures),
+    ...collectBaseRequirements(answers.uiLibrary, strategy),
+    ...collectFeatureRequirements(enabledFeatures, strategy),
   ];
 }
 
