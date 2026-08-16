@@ -42,6 +42,7 @@ console.log("Generated at", result.targetDir);
 const mustExist = [
   "package.json",
   "next.config.mjs",
+  "src/proxy.ts",
   "src/app/[locale]/layout.tsx",
   "src/lib/api/client.ts",
   "src/lib/auth/refresh.ts",

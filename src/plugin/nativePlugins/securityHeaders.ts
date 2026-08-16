@@ -9,9 +9,8 @@ import { definePlugin } from "../definePlugin.js";
  * `MIDDLEWARE_CONTRIBUTIONS` array (transform and marker string are
  * unchanged) - it now lives on the plugin itself and is applied by the
  * generic `applyPluginPatches()` executor (see `src/plugin/applyPatches.ts`)
- * instead of a generator-owned, per-feature array. This is the reference
- * migration for Phase 2.3: every other `next.config.mjs`/provider-tree
- * patcher stays on the Phase 1 system until it migrates the same way.
+ * instead of a generator-owned, per-feature array. Supports both Next.js 16
+ * `src/proxy.ts` and legacy `src/middleware.ts`.
  */
 export const securityHeadersPlugin = definePlugin({
   id: "securityHeaders",
@@ -29,6 +28,35 @@ export const securityHeadersPlugin = definePlugin({
   conflicts: PLUGIN_METADATA.securityHeaders.conflicts,
   supportedUI: PLUGIN_METADATA.securityHeaders.supportedUI,
   patches: [
+    {
+      target: "src/proxy.ts",
+      label: "wrap next-intl proxy to apply security headers",
+      marker: "@/lib/security-headers",
+      transform: (content) =>
+        content
+          .replace(
+            'import createMiddleware from "next-intl/middleware";',
+            'import createMiddleware from "next-intl/middleware";\nimport { applySecurityHeaders } from "@/lib/security-headers";',
+          )
+          .replace(
+            "export default function proxy(request: NextRequest) {\n  return handleRouting(request);\n}",
+            `export default async function proxy(request: NextRequest) {
+  const response = await handleRouting(request);
+  try { applySecurityHeaders(response); } catch (e) { /* noop */ }
+  return response;
+}`,
+          )
+          .replace(
+            "export default createMiddleware(routing);",
+            `const __nova_next_middleware = createMiddleware(routing);
+
+export default async function proxy(request) {
+  const response = await __nova_next_middleware(request);
+  try { applySecurityHeaders(response); } catch (e) { /* noop */ }
+  return response;
+}`,
+          ),
+    },
     {
       target: "src/middleware.ts",
       label: "wrap next-intl middleware to apply security headers",
