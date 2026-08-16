@@ -27,7 +27,7 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
   };
 
   const dependencies: Record<string, string> = {
-    next: "^15.1.0",
+    next: "^16.0.0",
     react: "^19.0.0",
     "react-dom": "^19.0.0",
     "next-intl": "^4.13.0",
@@ -53,8 +53,8 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
     "@types/react-dom": "^19.0.2",
     eslint: "^9.17.0",
     "@eslint/js": "^9.17.0",
-    "@next/eslint-plugin-next": "^15.1.0",
-    "eslint-config-next": "^15.1.0",
+    "@next/eslint-plugin-next": "^16.0.0",
+    "eslint-config-next": "^16.0.0",
     globals: "^15.14.0",
     "@typescript-eslint/eslint-plugin": "^8.18.2",
     "@typescript-eslint/parser": "^8.18.2",

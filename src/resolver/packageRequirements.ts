@@ -14,13 +14,31 @@ import type { Answers, FeatureKey, UiLibrary } from "../types.js";
 import type { PackageRequirement, PackageResolutionStrategy } from "./types.js";
 
 /**
- * Converts a version string from FEATURE_CONTRIBUTIONS (e.g. "^0.36.4")
- * into a PackageRequirement with the appropriate strategy.
+ * Packages where major version changes have breaking configuration / compiler
+ * semantics that must match the project template architecture (e.g. Tailwind v3
+ * uses tailwindcss + postcss, whereas Tailwind v4 requires @tailwindcss/postcss;
+ * TypeScript 5.x compiler options; React 19 type declarations).
  *
- * - Defaults to "latest" so project creation and additions install the latest
- *   stable releases published on npm (e.g. Next.js 16.3.1, React 19, etc.).
- * - "compatible" resolves the newest version satisfying the declared range.
- * - "exact" validates that the exact version exists.
+ * These packages resolve the newest release within their declared major/minor range
+ * ("compatible" strategy) instead of jumping across major boundaries.
+ */
+const COMPATIBLE_PINNED_PACKAGES = new Set<string>([
+  "tailwindcss",
+  "prettier-plugin-tailwindcss",
+  "typescript",
+  "@types/node",
+  "@types/react",
+  "@types/react-dom",
+  "@typescript-eslint/eslint-plugin",
+  "@typescript-eslint/parser",
+  "eslint",
+  "postcss",
+  "autoprefixer",
+]);
+
+/**
+ * Converts a version string from FEATURE_CONTRIBUTIONS or base dependencies
+ * into a PackageRequirement with the appropriate strategy.
  */
 function versionToRequirement(
   name: string,
@@ -41,9 +59,15 @@ function versionToRequirement(
 
   const range = /^[\^~><=]|\|\|/.test(trimmed) ? trimmed : `^${trimmed}`;
 
+  // If the package is in the compatibility pinned list and defaultStrategy is latest,
+  // use "compatible" so it resolves the newest version within the template-compatible range.
+  const strategy = COMPATIBLE_PINNED_PACKAGES.has(name) && defaultStrategy === "latest"
+    ? "compatible"
+    : defaultStrategy;
+
   return {
     name,
-    strategy: defaultStrategy,
+    strategy,
     range,
     dev,
   };
@@ -61,7 +85,7 @@ export function collectBaseRequirements(
 
   // Base dependencies (always present)
   const baseDeps: Record<string, string> = {
-    next: "^15.1.0",
+    next: "^16.0.0",
     react: "^19.0.0",
     "react-dom": "^19.0.0",
     "next-intl": "^4.13.0",
@@ -92,8 +116,8 @@ export function collectBaseRequirements(
     "@types/react-dom": "^19.0.2",
     eslint: "^9.17.0",
     "@eslint/js": "^9.17.0",
-    "@next/eslint-plugin-next": "^15.1.0",
-    "eslint-config-next": "^15.1.0",
+    "@next/eslint-plugin-next": "^16.0.0",
+    "eslint-config-next": "^16.0.0",
     globals: "^15.14.0",
     "@typescript-eslint/eslint-plugin": "^8.18.2",
     "@typescript-eslint/parser": "^8.18.2",
