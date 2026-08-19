@@ -576,30 +576,30 @@ nova create my-saas-app --preset saas
 
 | Template | Category | Description | Key Features | Aliases |
 | :--- | :--- | :--- | :--- | :--- |
-| **`minimal`** | Starter | Lean, clean Next.js App Router | TypeScript, Tailwind CSS, shadcn UI, Vitest | `default` |
-| **`saas`** | SaaS | Production-ready subscription SaaS | Better Auth, Drizzle ORM, React Email, Storage, Payments, Sentry, Vitest, Playwright | — |
-| **`admin`** | Dashboard | Enterprise admin dashboard | Better Auth, Drizzle ORM, TanStack Table, Recharts, Zustand, Vitest, Playwright | `dashboard` |
-| **`ecommerce`** | E-commerce | Online storefront & product catalog | Better Auth, Drizzle ORM, TanStack Table, Cart State (Zustand), Payments, Storage, Testing | `store` |
-| **`blog`** | Content | Content publishing & headless CMS | Better Auth, Drizzle ORM, Tiptap Editor, TanStack Table, Storage, TanStack Query, Vitest | `cms` |
-| **`ai`** | AI | Conversational AI platform | Vercel AI SDK, OpenAI/Claude/Ollama streaming, Storage, Chat State (Zustand), Testing | — |
-| **`api`** | Backend | Headless microservice & API backend | tRPC type-safe procedures, OpenAPI contracts, Docker, Health probes, Vitest | — |
-| **`realtime`** | Live App | Interactive real-time streaming app | Server-Sent Events (SSE), Presence & Live Notifications, Redis cache, Drizzle ORM, Zustand | — |
+| **`minimal`** | Starter | Lean, clean Next.js App Router | TypeScript, Tailwind CSS, shadcn UI, Vitest, Husky | `default` |
+| **`saas`** | SaaS | Production-ready subscription SaaS | Better Auth, Drizzle ORM, React Email, Storage, Payments, Sentry, Vitest, Playwright, Husky | — |
+| **`admin`** | Dashboard | Enterprise admin dashboard | Better Auth, Drizzle ORM, TanStack Table, Recharts, Zustand, Vitest, Playwright, Husky | `dashboard` |
+| **`ecommerce`** | E-commerce | Online storefront & product catalog | Better Auth, Drizzle ORM, TanStack Table, Cart State (Zustand), Payments, Storage, Testing, Husky | `store` |
+| **`blog`** | Content | Content publishing & headless CMS | Better Auth, Drizzle ORM, Tiptap Editor, TanStack Table, Storage, TanStack Query, Vitest, Husky | `cms` |
+| **`ai`** | AI | Conversational AI platform | Vercel AI SDK, OpenAI/Claude/Ollama streaming, Storage, Chat State (Zustand), Testing, Husky | — |
+| **`api`** | Backend | Headless microservice & API backend | tRPC type-safe procedures, OpenAPI contracts, Docker, Health probes, Vitest, Husky | — |
+| **`realtime`** | Live App | Interactive real-time streaming app | Server-Sent Events (SSE), Presence & Live Notifications, Redis cache, Drizzle ORM, Zustand, Husky | — |
 | **`react-native`** | Mobile | Native cross-platform mobile app | Expo SDK 52, React Native 0.76, TypeScript, Theme Tokens, Safe Area, API Client | `mobile`, `expo` |
 
 ### Official Presets (`nova presets`)
 
 | Preset | Category | Description | Included Plugins |
 | :--- | :--- | :--- | :--- |
-| **`minimal`** | Starter | Minimal Next.js starter stack | `vitest` |
-| **`fullstack`** | App | Fullstack Next.js production stack | `drizzle`, `betterAuth`, `trpc`, `tanstackQuery`, `vitest`, `playwright` |
-| **`saas`** | SaaS | Subscription SaaS platform | `drizzle`, `betterAuth`, `tanstackQuery`, `sentry`, `reactEmail`, `storage`, `payments`, `dockerCompose`, `securityHeaders`, `health`, `vitest`, `playwright` |
-| **`admin`** | Dashboard | Enterprise admin dashboard | `betterAuth`, `drizzle`, `tanstackTable`, `recharts`, `tanstackQuery`, `zustand`, `vitest`, `playwright` |
-| **`dashboard`** | Analytics | Data visualization dashboard | `tanstackTable`, `recharts`, `tanstackQuery`, `zustand`, `vitest` |
-| **`ecommerce`** | E-commerce | Online store platform | `drizzle`, `betterAuth`, `tanstackTable`, `tanstackQuery`, `zustand`, `payments`, `storage`, `vitest`, `playwright` |
-| **`blog`** | Content | Content management platform | `drizzle`, `betterAuth`, `tiptap`, `tanstackTable`, `storage`, `tanstackQuery`, `vitest` |
-| **`ai`** | AI | AI & LLM streaming application | `ai`, `openai`, `betterAuth`, `storage`, `tanstackQuery`, `zustand`, `vitest` |
-| **`api`** | API | Microservice & typed backend | `trpc`, `openapi`, `docker`, `health`, `vitest` |
-| **`realtime`** | Real-time | Live streaming & events | `realtime`, `betterAuth`, `drizzle`, `redis`, `zustand`, `tanstackQuery`, `vitest` |
+| **`minimal`** | Starter | Minimal Next.js starter stack | `vitest`, `husky` |
+| **`fullstack`** | App | Fullstack Next.js production stack | `drizzle`, `betterAuth`, `trpc`, `tanstackQuery`, `vitest`, `playwright`, `husky` |
+| **`saas`** | SaaS | Subscription SaaS platform | `drizzle`, `betterAuth`, `tanstackQuery`, `sentry`, `reactEmail`, `storage`, `payments`, `dockerCompose`, `securityHeaders`, `health`, `vitest`, `playwright`, `husky` |
+| **`admin`** | Dashboard | Enterprise admin dashboard | `betterAuth`, `drizzle`, `tanstackTable`, `recharts`, `tanstackQuery`, `zustand`, `vitest`, `playwright`, `husky` |
+| **`dashboard`** | Analytics | Data visualization dashboard | `tanstackTable`, `recharts`, `tanstackQuery`, `zustand`, `vitest`, `husky` |
+| **`ecommerce`** | E-commerce | Online store platform | `drizzle`, `betterAuth`, `tanstackTable`, `tanstackQuery`, `zustand`, `payments`, `storage`, `vitest`, `playwright`, `husky` |
+| **`blog`** | Content | Content management platform | `drizzle`, `betterAuth`, `tiptap`, `tanstackTable`, `storage`, `tanstackQuery`, `vitest`, `husky` |
+| **`ai`** | AI | AI & LLM streaming application | `ai`, `openai`, `betterAuth`, `storage`, `tanstackQuery`, `zustand`, `vitest`, `husky` |
+| **`api`** | API | Microservice & typed backend | `trpc`, `openapi`, `docker`, `health`, `vitest`, `husky` |
+| **`realtime`** | Real-time | Live streaming & events | `realtime`, `betterAuth`, `drizzle`, `redis`, `zustand`, `tanstackQuery`, `vitest`, `husky` |
 
 ### Reusable Feature Plugins
 

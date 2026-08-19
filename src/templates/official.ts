@@ -4,12 +4,12 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
   {
     id: "minimal",
     name: "Minimal Next.js",
-    description: "Lean, clean Next.js application with TypeScript, Tailwind CSS, shadcn UI, and Vitest",
+    description: "Lean, clean Next.js application with TypeScript, Tailwind CSS, shadcn UI, Vitest, and Husky git hooks",
     category: "starter",
     presetId: "minimal",
     defaultUiLibrary: "shadcn",
     structure: "nextjs",
-    features: ["Next.js App Router", "TypeScript", "Tailwind CSS", "shadcn UI", "Vitest"],
+    features: ["Next.js App Router", "TypeScript", "Tailwind CSS", "shadcn UI", "Vitest", "Husky + lint-staged Git Hooks"],
     aliases: ["default"],
     compatibility: {
       node: ">=18.18.0",
@@ -20,7 +20,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
   {
     id: "saas",
     name: "SaaS Application",
-    description: "Production-ready SaaS with Drizzle ORM, Better Auth, transactional email, storage, billing-ready architecture, and testing",
+    description: "Production-ready SaaS with Drizzle ORM, Better Auth, transactional email, storage, billing-ready architecture, testing, and Husky git hooks",
     category: "saas",
     presetId: "saas",
     defaultUiLibrary: "shadcn",
@@ -35,6 +35,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
       "Observability (Sentry)",
       "Security Headers & Health Endpoints",
       "Testing (Vitest + Playwright)",
+      "Git Hooks (Husky + lint-staged)",
     ],
     compatibility: {
       node: ">=18.18.0",
@@ -45,7 +46,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
   {
     id: "admin",
     name: "Admin Dashboard",
-    description: "Enterprise administration dashboard with authentication, interactive TanStack tables, Recharts visualizations, and client state",
+    description: "Enterprise administration dashboard with authentication, interactive TanStack tables, Recharts visualizations, client state, and Husky git hooks",
     category: "dashboard",
     presetId: "admin",
     defaultUiLibrary: "shadcn",
@@ -58,6 +59,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
       "Query Caching (TanStack Query)",
       "Client Store (Zustand)",
       "Testing (Vitest + Playwright)",
+      "Git Hooks (Husky + lint-staged)",
     ],
     aliases: ["dashboard"],
     compatibility: {
@@ -69,7 +71,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
   {
     id: "ecommerce",
     name: "E-commerce Platform",
-    description: "Full-stack e-commerce starter with product catalog, cart state, orders table, storage, and payment checkout architecture",
+    description: "Full-stack e-commerce starter with product catalog, cart state, orders table, storage, payment checkout architecture, and Husky git hooks",
     category: "ecommerce",
     presetId: "ecommerce",
     defaultUiLibrary: "shadcn",
@@ -82,6 +84,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
       "Checkout & Billing Abstraction (Payments)",
       "Product Media Uploads (Storage)",
       "Testing (Vitest + Playwright)",
+      "Git Hooks (Husky + lint-staged)",
     ],
     aliases: ["store"],
     compatibility: {
@@ -93,7 +96,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
   {
     id: "blog",
     name: "Blog & CMS",
-    description: "Content publishing application with Tiptap rich text editor, content management tables, uploads, and data fetching",
+    description: "Content publishing application with Tiptap rich text editor, content management tables, uploads, data fetching, and Husky git hooks",
     category: "content",
     presetId: "blog",
     defaultUiLibrary: "shadcn",
@@ -106,6 +109,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
       "Cover Image Uploads (Storage)",
       "Data Caching (TanStack Query)",
       "Testing (Vitest)",
+      "Git Hooks (Husky + lint-staged)",
     ],
     aliases: ["cms"],
     compatibility: {
@@ -117,7 +121,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
   {
     id: "ai",
     name: "AI Application",
-    description: "Conversational AI platform with Vercel AI SDK, multi-model streaming (OpenAI, Claude, Ollama), storage, and chat interface",
+    description: "Conversational AI platform with Vercel AI SDK, multi-model streaming (OpenAI, Claude, Ollama), storage, chat interface, and Husky git hooks",
     category: "ai",
     presetId: "ai",
     defaultUiLibrary: "shadcn",
@@ -130,6 +134,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
       "Chat State & History (Zustand)",
       "Data Fetching (TanStack Query)",
       "Testing (Vitest)",
+      "Git Hooks (Husky + lint-staged)",
     ],
     compatibility: {
       node: ">=18.18.0",
@@ -140,7 +145,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
   {
     id: "api",
     name: "API Starter",
-    description: "Headless microservice backend with tRPC type-safe procedures, OpenAPI contracts, Docker, and health check probes",
+    description: "Headless microservice backend with tRPC type-safe procedures, OpenAPI contracts, Docker, health check probes, and Husky git hooks",
     category: "api",
     presetId: "api",
     defaultUiLibrary: "headless",
@@ -151,6 +156,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
       "Production Containerization (Docker)",
       "Liveness & Readiness Endpoints (Health)",
       "Testing (Vitest)",
+      "Git Hooks (Husky + lint-staged)",
     ],
     compatibility: {
       node: ">=18.18.0",
@@ -161,7 +167,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
   {
     id: "realtime",
     name: "Real-time Application",
-    description: "Live interactive application with Server-Sent Events (SSE), presence & notifications, Redis caching, and state",
+    description: "Live interactive application with Server-Sent Events (SSE), presence & notifications, Redis caching, state, and Husky git hooks",
     category: "realtime",
     presetId: "realtime",
     defaultUiLibrary: "shadcn",
@@ -174,6 +180,7 @@ export const OFFICIAL_TEMPLATES: TemplateDefinition[] = [
       "Real-time UI State (Zustand)",
       "Query Invalidation (TanStack Query)",
       "Testing (Vitest)",
+      "Git Hooks (Husky + lint-staged)",
     ],
     compatibility: {
       node: ">=18.18.0",

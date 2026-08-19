@@ -4,15 +4,15 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
   {
     id: "minimal",
     name: "Minimal Next.js",
-    description: "Lean, clean Next.js starter with TypeScript, Tailwind CSS, and unit testing",
+    description: "Lean, clean Next.js starter with TypeScript, Tailwind CSS, unit testing, and git hooks",
     category: "starter",
     defaultUiLibrary: "shadcn",
-    plugins: ["vitest"],
+    plugins: ["vitest", "husky"],
   },
   {
     id: "fullstack",
     name: "Fullstack Application",
-    description: "Production fullstack Next.js with Drizzle ORM, Better Auth, tRPC, Query, and E2E testing",
+    description: "Production fullstack Next.js with Drizzle ORM, Better Auth, tRPC, Query, E2E testing, and git hooks",
     category: "app",
     defaultUiLibrary: "shadcn",
     plugins: [
@@ -22,12 +22,13 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
       "tanstackQuery",
       "vitest",
       "playwright",
+      "husky",
     ],
   },
   {
     id: "saas",
     name: "SaaS Starter",
-    description: "Complete SaaS starter with database, auth, email, storage, billing-ready, monitoring, and security",
+    description: "Complete SaaS starter with database, auth, email, storage, billing-ready, monitoring, security, and git hooks",
     category: "saas",
     defaultUiLibrary: "shadcn",
     plugins: [
@@ -43,12 +44,13 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
       "health",
       "vitest",
       "playwright",
+      "husky",
     ],
   },
   {
     id: "admin",
     name: "Admin Dashboard",
-    description: "Enterprise admin dashboard with auth, data tables, charting, state management, and testing",
+    description: "Enterprise admin dashboard with auth, data tables, charting, state management, testing, and git hooks",
     category: "dashboard",
     defaultUiLibrary: "shadcn",
     plugins: [
@@ -60,12 +62,13 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
       "zustand",
       "vitest",
       "playwright",
+      "husky",
     ],
   },
   {
     id: "dashboard",
     name: "Analytics Dashboard",
-    description: "Data-heavy dashboard with TanStack Tables, Recharts charts, Query caching, state, and testing",
+    description: "Data-heavy dashboard with TanStack Tables, Recharts charts, Query caching, state, testing, and git hooks",
     category: "analytics",
     defaultUiLibrary: "shadcn",
     plugins: [
@@ -74,12 +77,13 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
       "tanstackQuery",
       "zustand",
       "vitest",
+      "husky",
     ],
   },
   {
     id: "ecommerce",
     name: "E-commerce Platform",
-    description: "Online store starter with catalog tables, cart state, checkout/payments architecture, and storage",
+    description: "Online store starter with catalog tables, cart state, checkout/payments architecture, storage, and git hooks",
     category: "ecommerce",
     defaultUiLibrary: "shadcn",
     plugins: [
@@ -92,12 +96,13 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
       "storage",
       "vitest",
       "playwright",
+      "husky",
     ],
   },
   {
     id: "blog",
     name: "Blog & CMS",
-    description: "Content management platform with rich text editor, content tables, uploads, and queries",
+    description: "Content management platform with rich text editor, content tables, uploads, queries, and git hooks",
     category: "content",
     defaultUiLibrary: "shadcn",
     plugins: [
@@ -108,12 +113,13 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
       "storage",
       "tanstackQuery",
       "vitest",
+      "husky",
     ],
   },
   {
     id: "ai",
     name: "AI & LLM Application",
-    description: "AI streaming app with Vercel AI SDK, OpenAI model integration, storage, and state management",
+    description: "AI streaming app with Vercel AI SDK, OpenAI model integration, storage, state management, and git hooks",
     category: "ai",
     defaultUiLibrary: "shadcn",
     plugins: [
@@ -124,12 +130,13 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
       "tanstackQuery",
       "zustand",
       "vitest",
+      "husky",
     ],
   },
   {
     id: "api",
     name: "API & Microservice",
-    description: "Type-safe API backend with tRPC, OpenAPI validation, Docker containerization, and health checks",
+    description: "Type-safe API backend with tRPC, OpenAPI validation, Docker containerization, health checks, and git hooks",
     category: "api",
     defaultUiLibrary: "headless",
     plugins: [
@@ -138,12 +145,13 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
       "docker",
       "health",
       "vitest",
+      "husky",
     ],
   },
   {
     id: "realtime",
     name: "Real-time Application",
-    description: "Live streaming events, real-time presence/notifications, database, caching, and state",
+    description: "Live streaming events, real-time presence/notifications, database, caching, state, and git hooks",
     category: "realtime",
     defaultUiLibrary: "shadcn",
     plugins: [
@@ -154,6 +162,7 @@ export const OFFICIAL_PRESETS: PresetDefinition[] = [
       "zustand",
       "tanstackQuery",
       "vitest",
+      "husky",
     ],
   },
 ];
