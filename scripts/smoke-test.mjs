@@ -813,6 +813,135 @@ if (aiNovaConfig.template !== "ai" || !aiNovaConfig.plugins.includes("ai")) {
   process.exit(1);
 }
 
+// ── Additional Template System Smoke Tests ────────────────────────
+
+// E-commerce template test
+const ecommerceAnswers = {
+  projectName: "smoke-ecommerce",
+  packageManager: "pnpm",
+  uiLibrary: "shadcn",
+  template: "ecommerce",
+  preset: "ecommerce",
+  installNow: false,
+  initGit: false,
+  features: {
+    drizzle: true,
+    betterAuth: true,
+    tanstackTable: true,
+    tanstackQuery: true,
+    zustand: true,
+    payments: true,
+    storage: true,
+    vitest: true,
+    playwright: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, ecommerceAnswers.projectName));
+const ecommerceResult = await generateProject(ecommerceAnswers, { onStep: (s) => console.log("ecommerce step:", s) });
+const ecommerceMustExist = [
+  "src/lib/payments/client.ts",
+  "src/lib/storage/client.ts",
+  "src/components/common/file-upload.tsx",
+  "src/components/common/pricing-table.tsx",
+  "src/app/api/upload/route.ts",
+  "src/app/api/webhooks/payments/route.ts",
+  "docs/payments.md",
+  "docs/storage.md",
+];
+
+missing = [];
+for (const rel of ecommerceMustExist) {
+  const exists = await fs.pathExists(path.join(ecommerceResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+if (missing.length) {
+  console.error("MISSING E-COMMERCE FILES:", missing);
+  process.exit(1);
+}
+console.log("✓ E-commerce template smoke test passed");
+
+// Realtime template test
+const realtimeAnswers = {
+  projectName: "smoke-realtime",
+  packageManager: "pnpm",
+  uiLibrary: "shadcn",
+  template: "realtime",
+  preset: "realtime",
+  installNow: false,
+  initGit: false,
+  features: {
+    realtime: true,
+    betterAuth: true,
+    drizzle: true,
+    redis: true,
+    zustand: true,
+    tanstackQuery: true,
+    vitest: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, realtimeAnswers.projectName));
+const realtimeResult = await generateProject(realtimeAnswers, { onStep: (s) => console.log("realtime step:", s) });
+const realtimeMustExist = [
+  "src/lib/realtime/client.ts",
+  "src/lib/realtime/server.ts",
+  "src/app/api/realtime/route.ts",
+  "src/components/common/notification-center.tsx",
+  "docs/realtime.md",
+];
+
+missing = [];
+for (const rel of realtimeMustExist) {
+  const exists = await fs.pathExists(path.join(realtimeResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+if (missing.length) {
+  console.error("MISSING REALTIME FILES:", missing);
+  process.exit(1);
+}
+console.log("✓ Realtime template smoke test passed");
+
+// Blog / CMS template test
+const blogAnswers = {
+  projectName: "smoke-blog",
+  packageManager: "pnpm",
+  uiLibrary: "shadcn",
+  template: "blog",
+  preset: "blog",
+  installNow: false,
+  initGit: false,
+  features: {
+    drizzle: true,
+    betterAuth: true,
+    tiptap: true,
+    tanstackTable: true,
+    storage: true,
+    tanstackQuery: true,
+    vitest: true,
+  },
+};
+
+await fs.remove(path.join(tmpRoot, blogAnswers.projectName));
+const blogResult = await generateProject(blogAnswers, { onStep: (s) => console.log("blog step:", s) });
+const blogMustExist = [
+  "src/components/ui/editor/rich-text-editor.tsx",
+  "src/lib/storage/client.ts",
+  "docs/tiptap.md",
+  "docs/storage.md",
+];
+
+missing = [];
+for (const rel of blogMustExist) {
+  const exists = await fs.pathExists(path.join(blogResult.targetDir, rel));
+  if (!exists) missing.push(rel);
+}
+if (missing.length) {
+  console.error("MISSING BLOG FILES:", missing);
+  process.exit(1);
+}
+console.log("✓ Blog / CMS template smoke test passed");
+
 console.log("SMOKE TEST OK");
 
 

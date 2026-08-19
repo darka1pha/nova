@@ -7,6 +7,7 @@ import { runPluginPrompts } from "./plugin/prompts.js";
 import { getTemplate, resolveTemplate } from "./templates/registry.js";
 import { getPreset, resolvePreset } from "./presets/registry.js";
 import { resolveFeatureKey } from "./addonRegistry.js";
+import { PLUGIN_METADATA } from "./generator/pluginMetadata.js";
 import type { Answers, FeatureFlags, FeatureKey, UiLibrary } from "./types.js";
 
 const PROJECT_NAME_PATTERN = /^[a-z0-9-_]+$/i;
@@ -28,6 +29,9 @@ export const FEATURE_OPTIONS: FeatureOption[] = [
   { value: "openai", label: "OpenAI Provider", hint: "OpenAI model provider integration" },
   { value: "anthropic", label: "Anthropic Provider", hint: "Claude model provider integration" },
   { value: "ollama", label: "Ollama Provider", hint: "Local Ollama model provider integration" },
+  { value: "storage", label: "File Storage", hint: "Multi-driver storage (Local, S3, Supabase)" },
+  { value: "realtime", label: "Real-time Events", hint: "Server-Sent Events & live streaming updates" },
+  { value: "payments", label: "Payments / Billing", hint: "Provider-ready checkout & subscriptions abstraction" },
   { value: "cypress", label: "Cypress", hint: "E2E testing" },
   { value: "vitest", label: "Vitest", hint: "Unit/component testing" },
   { value: "storybook", label: "Storybook", hint: "Component workshop" },
@@ -64,6 +68,7 @@ export interface CliCreateOptions {
   packageManager?: PackageManager;
   yes?: boolean;
   features?: string[];
+  orm?: string;
   installNow?: boolean;
   initGit?: boolean;
 }
@@ -142,12 +147,15 @@ export async function collectAnswers(
     const templateChoice = await p.select<string>({
       message: "Which starter template do you want to use?",
       options: [
-        { value: "default", label: "Default Next.js", hint: "Clean App Router setup with Tailwind CSS" },
-        { value: "saas", label: "SaaS Application", hint: "Auth, database, email, monitoring, and security" },
-        { value: "ai", label: "AI / LLM Application", hint: "Vercel AI SDK, OpenAI streaming, and chat interface" },
-        { value: "dashboard", label: "Analytics Dashboard", hint: "TanStack tables, Recharts visualizations, and Query" },
-        { value: "api", label: "API Service", hint: "tRPC, OpenAPI validation, Docker, and health checks" },
-        { value: "custom", label: "Custom Architecture", hint: "Pick and choose individual plugins" },
+        { value: "minimal", label: "Minimal Next.js", hint: "Lean App Router setup with Tailwind CSS and testing" },
+        { value: "saas", label: "SaaS Application", hint: "Auth, database, email, storage, billing-ready, and testing" },
+        { value: "admin", label: "Admin Dashboard", hint: "Data tables, Recharts visualizations, auth, and state" },
+        { value: "ecommerce", label: "E-commerce Platform", hint: "Product catalog, cart, checkout architecture, and storage" },
+        { value: "blog", label: "Blog & CMS", hint: "Tiptap rich text editor, content management tables, and uploads" },
+        { value: "ai", label: "AI Application", hint: "Vercel AI SDK, OpenAI/Claude streaming, storage, and chat UI" },
+        { value: "api", label: "API Starter", hint: "tRPC, OpenAPI contract validation, Docker, and health checks" },
+        { value: "realtime", label: "Real-time Application", hint: "Server-Sent Events, presence/notifications, and Redis" },
+        { value: "custom", label: "Custom Architecture", hint: "Pick and choose individual plugins manually" },
       ],
     });
     bail(templateChoice);
@@ -199,11 +207,33 @@ export async function collectAnswers(
   // 5. Features / Plugins Selection
   const activeFeatures = new Set<FeatureKey>(preconfiguredPlugins);
 
+  // CLI explicit ORM override
+  if (options.orm) {
+    const ormKey = resolveFeatureKey(options.orm);
+    if (ormKey === "prisma") {
+      activeFeatures.delete("drizzle");
+      activeFeatures.add("prisma");
+    } else if (ormKey === "drizzle") {
+      activeFeatures.delete("prisma");
+      activeFeatures.add("drizzle");
+    }
+  }
+
   // CLI explicit features override / add
   if (options.features?.length) {
     for (const f of options.features) {
       const resolved = resolveFeatureKey(f);
-      if (resolved) activeFeatures.add(resolved);
+      if (resolved) {
+        // If the explicitly requested feature conflicts with a template default,
+        // prioritize the user's explicit selection
+        const meta = PLUGIN_METADATA[resolved];
+        if (meta?.conflicts) {
+          for (const conflict of meta.conflicts) {
+            activeFeatures.delete(conflict);
+          }
+        }
+        activeFeatures.add(resolved);
+      }
     }
   } else if (!selectedTemplate && !selectedPreset && !isNonInteractive) {
     const featureSelection = await p.multiselect<FeatureKey>({

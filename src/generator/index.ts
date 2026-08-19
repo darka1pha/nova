@@ -521,6 +521,9 @@ async function patchReadme(targetDir: string, answers: Answers) {
     openai: "OpenAI Model Provider",
     anthropic: "Anthropic Claude Provider",
     ollama: "Ollama Local Model Provider",
+    storage: "File Storage & Uploads",
+    realtime: "Real-time Events & Streaming",
+    payments: "Payments & Billing Abstraction",
   };
 
 

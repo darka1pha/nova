@@ -42,6 +42,9 @@ export const ADDON_FOLDERS: Record<FeatureKey, string> = {
   openai: "openai",
   anthropic: "anthropic",
   ollama: "ollama",
+  storage: "storage",
+  realtime: "realtime",
+  payments: "payments",
 };
 
 

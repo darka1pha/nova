@@ -314,7 +314,11 @@ try {
 
 // 13. Presets System
 const presets = listPresets();
-assert.ok(presets.length >= 5, "Must have at least 5 official presets");
+assert.ok(presets.length >= 8, `Must have at least 8 official presets, got ${presets.length}`);
+
+const minimalPreset = resolvePreset("minimal");
+assert.equal(minimalPreset.valid, true, "Minimal preset must resolve cleanly");
+assert.ok(minimalPreset.resolvedPlugins.includes("vitest"));
 
 const fullstackPreset = resolvePreset("fullstack");
 assert.equal(fullstackPreset.valid, true, "Fullstack preset must resolve cleanly");
@@ -329,6 +333,23 @@ assert.equal(saasPreset.valid, true, "SaaS preset must resolve cleanly");
 assert.ok(saasPreset.resolvedPlugins.includes("drizzle"));
 assert.ok(saasPreset.resolvedPlugins.includes("sentry"));
 assert.ok(saasPreset.resolvedPlugins.includes("reactEmail"));
+assert.ok(saasPreset.resolvedPlugins.includes("storage"));
+assert.ok(saasPreset.resolvedPlugins.includes("payments"));
+
+const adminPreset = resolvePreset("admin");
+assert.equal(adminPreset.valid, true, "Admin preset must resolve cleanly");
+assert.ok(adminPreset.resolvedPlugins.includes("tanstackTable"));
+assert.ok(adminPreset.resolvedPlugins.includes("recharts"));
+
+const ecommercePreset = resolvePreset("ecommerce");
+assert.equal(ecommercePreset.valid, true, "E-commerce preset must resolve cleanly");
+assert.ok(ecommercePreset.resolvedPlugins.includes("payments"));
+assert.ok(ecommercePreset.resolvedPlugins.includes("storage"));
+
+const blogPreset = resolvePreset("blog");
+assert.equal(blogPreset.valid, true, "Blog preset must resolve cleanly");
+assert.ok(blogPreset.resolvedPlugins.includes("tiptap"));
+assert.ok(blogPreset.resolvedPlugins.includes("storage"));
 
 const aiPreset = resolvePreset("ai");
 assert.equal(aiPreset.valid, true, "AI preset must resolve cleanly");
@@ -336,29 +357,87 @@ assert.ok(aiPreset.resolvedPlugins.includes("ai"));
 assert.ok(aiPreset.resolvedPlugins.includes("openai"));
 assert.ok(aiPreset.resolvedPlugins.includes("zustand"));
 
+const realtimePreset = resolvePreset("realtime");
+assert.equal(realtimePreset.valid, true, "Realtime preset must resolve cleanly");
+assert.ok(realtimePreset.resolvedPlugins.includes("realtime"));
+assert.ok(realtimePreset.resolvedPlugins.includes("redis"));
+
+const apiPreset = resolvePreset("api");
+assert.equal(apiPreset.valid, true, "API preset must resolve cleanly");
+assert.ok(apiPreset.resolvedPlugins.includes("trpc"));
+assert.ok(apiPreset.resolvedPlugins.includes("openapi"));
+
 const invalidPreset = resolvePreset("non-existent-preset");
 assert.equal(invalidPreset.valid, false, "Unknown preset must report failure");
 
-console.log("✓ Official presets (fullstack, saas, ai, dashboard, api) & resolution passed");
+console.log("✓ Official presets (minimal, fullstack, saas, admin, dashboard, ecommerce, blog, ai, api, realtime) & resolution passed");
 
 // 14. Templates System
 const templates = listTemplates();
-assert.ok(templates.length >= 5, "Must have at least 5 official templates");
+assert.ok(templates.length >= 8, `Must have at least 8 official templates, got ${templates.length}`);
+
+const minimalTpl = resolveTemplate("minimal");
+assert.equal(minimalTpl.valid, true, "Minimal template must resolve");
 
 const defaultTpl = resolveTemplate("default");
-assert.equal(defaultTpl.valid, true, "Default template must resolve");
+assert.equal(defaultTpl.valid, true, "Default template (alias to minimal) must resolve");
+assert.equal(defaultTpl.template.id, "minimal");
 
 const saasTpl = resolveTemplate("saas");
 assert.equal(saasTpl.valid, true, "SaaS template must resolve");
 assert.ok(saasTpl.resolvedPlugins.includes("drizzle"));
 assert.ok(saasTpl.resolvedPlugins.includes("betterAuth"));
+assert.ok(saasTpl.resolvedPlugins.includes("storage"));
+assert.ok(saasTpl.resolvedPlugins.includes("payments"));
+
+const adminTpl = resolveTemplate("admin");
+assert.equal(adminTpl.valid, true, "Admin template must resolve");
+assert.ok(adminTpl.resolvedPlugins.includes("tanstackTable"));
+assert.ok(adminTpl.resolvedPlugins.includes("recharts"));
+
+const dashboardAliasTpl = resolveTemplate("dashboard");
+assert.equal(dashboardAliasTpl.valid, true, "Dashboard alias must resolve to admin template");
+assert.equal(dashboardAliasTpl.template.id, "admin");
+
+const ecommerceTpl = resolveTemplate("ecommerce");
+assert.equal(ecommerceTpl.valid, true, "E-commerce template must resolve");
+assert.ok(ecommerceTpl.resolvedPlugins.includes("payments"));
+
+const blogTpl = resolveTemplate("blog");
+assert.equal(blogTpl.valid, true, "Blog template must resolve");
+assert.ok(blogTpl.resolvedPlugins.includes("tiptap"));
+
+const cmsAliasTpl = resolveTemplate("cms");
+assert.equal(cmsAliasTpl.valid, true, "CMS alias must resolve to blog template");
+assert.equal(cmsAliasTpl.template.id, "blog");
 
 const aiTpl = resolveTemplate("ai");
 assert.equal(aiTpl.valid, true, "AI template must resolve");
 assert.ok(aiTpl.resolvedPlugins.includes("ai"));
 assert.ok(aiTpl.resolvedPlugins.includes("openai"));
 
-console.log("✓ Official templates (default, saas, ai, dashboard, api) & composition passed");
+const apiTpl = resolveTemplate("api");
+assert.equal(apiTpl.valid, true, "API template must resolve");
+assert.ok(apiTpl.resolvedPlugins.includes("trpc"));
+
+const realtimeTpl = resolveTemplate("realtime");
+assert.equal(realtimeTpl.valid, true, "Realtime template must resolve");
+assert.ok(realtimeTpl.resolvedPlugins.includes("realtime"));
+
+const mobileTpl = resolveTemplate("react-native");
+assert.equal(mobileTpl.valid, true, "React Native template must resolve");
+assert.equal(mobileTpl.template.structure, "react-native");
+
+console.log("✓ Official templates (minimal, saas, admin, ecommerce, blog, ai, api, realtime, react-native) & composition passed");
+
+// 14b. Comprehensive Template Validation
+import { validateTemplateSystem } from "../src/templates/validator.js";
+const templateValidationSummary = await validateTemplateSystem();
+assert.equal(templateValidationSummary.valid, true, `Template system validation failed: ${JSON.stringify(templateValidationSummary.errors)}`);
+assert.ok(templateValidationSummary.templatesCount >= 9);
+assert.ok(templateValidationSummary.presetsCount >= 10);
+assert.ok(templateValidationSummary.featuresCount >= 37);
+console.log("✓ Template system comprehensive validator passed");
 
 // 15. Environment Management
 const envTmpDir = path.join(os.tmpdir(), "nova-env-test-" + Date.now());
@@ -432,6 +511,20 @@ assert.ok(ollamaManifest.requires?.includes("ai"));
 assert.ok(ollamaManifest.env?.some((e) => e.key === "OLLAMA_BASE_URL"));
 
 console.log("✓ AI & LLM native plugins (ai, openai, anthropic, ollama) verified");
+
+// 16b. Storage, Realtime, Payments Native Plugins
+const storageManifest = registry.requirePlugin("storage");
+assert.equal(storageManifest.category, "storage");
+assert.ok(storageManifest.dependencies?.["mime-types"]);
+
+const realtimeManifest = registry.requirePlugin("realtime");
+assert.ok(realtimeManifest.owns?.some((o) => o.includes("realtime")));
+
+const paymentsManifest = registry.requirePlugin("payments");
+assert.equal(paymentsManifest.category, "payments");
+assert.ok(paymentsManifest.owns?.some((o) => o.includes("payments")));
+
+console.log("✓ Storage, Realtime, Payments native plugins verified");
 
 // 17. Enhanced Project Status Breakdown
 const statusTmpDir = path.join(os.tmpdir(), "nova-status-test-" + Date.now());

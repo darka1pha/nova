@@ -245,6 +245,24 @@ export const PLUGIN_METADATA: Record<FeatureKey, PluginMetadata> = {
     requires: ["ai"],
     owns: ["src/lib/ai/ollama.ts"],
   },
+  storage: {
+    name: "File Storage & Uploads",
+    description: "Multi-driver file storage abstraction supporting local filesystem, S3, and Supabase Storage",
+    capabilities: ["infrastructure"],
+    owns: ["src/lib/storage/", "src/app/api/upload/", "src/components/common/file-upload.tsx"],
+  },
+  realtime: {
+    name: "Real-time Events & Streaming",
+    description: "Server-Sent Events (SSE) and event broadcasting abstraction for live updates and notifications",
+    capabilities: ["api", "infrastructure"],
+    owns: ["src/lib/realtime/", "src/app/api/realtime/", "src/components/common/notification-center.tsx"],
+  },
+  payments: {
+    name: "Payments & Billing Abstraction",
+    description: "Provider-agnostic subscription, checkout, and webhook verification architecture",
+    capabilities: ["api"],
+    owns: ["src/lib/payments/", "src/app/api/webhooks/payments/", "src/components/common/pricing-table.tsx"],
+  },
 };
 
 

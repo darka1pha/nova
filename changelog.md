@@ -6,6 +6,36 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ---
 
+## [0.2.3] - 2026-08-19
+
+### Added
+
+- **Official Production-Ready Starter Templates**:
+  - `minimal` (alias: `default`): Lean, clean Next.js App Router setup with TypeScript, Tailwind CSS, shadcn UI primitives, and Vitest.
+  - `saas`: Full-featured SaaS starter with Drizzle ORM, Better Auth, transactional email (React Email + Mailpit), multi-driver storage, payments abstraction, Sentry observability, Docker Compose, Vitest, and Playwright.
+  - `admin` (alias: `dashboard`): Enterprise administration dashboard with Better Auth, Drizzle ORM, TanStack Table, Recharts visualizations, Zustand client store, and TanStack Query.
+  - `ecommerce` (alias: `store`): Online store platform with product schema, cart state, order management tables, payments abstraction, and storage uploads.
+  - `blog` (alias: `cms`): Content publishing platform with Tiptap rich text editor, content management tables, post schema, and storage.
+  - `ai`: Conversational AI platform with Vercel AI SDK, OpenAI/Claude/Ollama provider streaming, document uploads, and chat history.
+  - `api`: Microservice backend with tRPC type-safe procedures, OpenAPI contracts, Docker containerization, and health check probes.
+  - `realtime`: Live streaming application with Server-Sent Events (SSE), presence & live notifications center, Redis cache, and Zustand state.
+  - `react-native` (aliases: `mobile`, `expo`): Cross-platform mobile starter powered by Expo SDK 52 and React Native 0.76.
+- **New Reusable Feature Plugins**:
+  - `storage`: Multi-driver storage abstraction supporting Local filesystem, AWS S3, and Supabase Storage with upload API routes and reactive `FileUpload` component.
+  - `realtime`: SSE event streaming client and server abstraction with a plug-and-play `NotificationCenter` component.
+  - `payments`: Modular payment provider abstraction (Stripe, LemonSqueezy, Paddle, Mock) with checkout sessions, pricing tables, and webhook routing.
+- **Template & Preset Validation System**:
+  - `validateTemplateSystem()` in `src/templates/validator.ts`
+  - Automated verification script `npm run verify:templates`
+  - Validation covering duplicate IDs, broken references, conflicting plugins, missing files, and package requirements.
+- **Enhanced CLI Commands**:
+  - `nova templates` & `nova templates --json`: List all official templates with rich descriptions, categories, and aliases.
+  - `nova template info <name>`: Deep inspect template composition, features, compatibility, and defaults.
+  - `nova presets`: List all architectural presets and their composing plugins.
+  - `nova create <name> --template <name>`: Create projects directly with any official template.
+
+---
+
 ## [0.2.2] - 2026-08-16
 
 ### Added

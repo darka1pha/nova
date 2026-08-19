@@ -9,6 +9,9 @@ import { aiPlugin } from "./ai.js";
 import { openaiPlugin } from "./openai.js";
 import { anthropicPlugin } from "./anthropic.js";
 import { ollamaPlugin } from "./ollama.js";
+import { storagePlugin } from "./storage.js";
+import { realtimePlugin } from "./realtime.js";
+import { paymentsPlugin } from "./payments.js";
 import type { PluginManifest } from "../types.js";
 
 /**
@@ -33,6 +36,9 @@ export const NATIVE_PLUGINS: PluginManifest[] = [
   openaiPlugin,
   anthropicPlugin,
   ollamaPlugin,
+  storagePlugin,
+  realtimePlugin,
+  paymentsPlugin,
 ];
 
 

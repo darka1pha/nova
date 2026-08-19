@@ -218,6 +218,16 @@ export const FEATURE_CONTRIBUTIONS: Record<FeatureKey, PackageAdditions> = {
       "ollama-ai-provider": "^1.1.0",
     },
   },
+  storage: {
+    dependencies: {
+      "mime-types": "^2.1.35",
+    },
+    devDependencies: {
+      "@types/mime-types": "^2.1.4",
+    },
+  },
+  realtime: {},
+  payments: {},
 };
 
 

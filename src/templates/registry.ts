@@ -10,6 +10,7 @@ export * from "./official.js";
 
 class TemplateRegistry {
   private templates = new Map<string, TemplateDefinition>();
+  private aliases = new Map<string, string>();
 
   constructor() {
     for (const tpl of OFFICIAL_TEMPLATES) {
@@ -18,11 +19,25 @@ class TemplateRegistry {
   }
 
   register(template: TemplateDefinition): void {
-    this.templates.set(template.id.toLowerCase(), template);
+    const key = template.id.toLowerCase();
+    this.templates.set(key, template);
+    if (template.aliases) {
+      for (const alias of template.aliases) {
+        this.aliases.set(alias.toLowerCase(), key);
+      }
+    }
   }
 
   get(id: string): TemplateDefinition | undefined {
-    return this.templates.get(id.toLowerCase());
+    const normalized = id.toLowerCase();
+    if (this.templates.has(normalized)) {
+      return this.templates.get(normalized);
+    }
+    const aliased = this.aliases.get(normalized);
+    if (aliased && this.templates.has(aliased)) {
+      return this.templates.get(aliased);
+    }
+    return undefined;
   }
 
   list(): TemplateDefinition[] {
@@ -92,3 +107,4 @@ export function listTemplates(): TemplateDefinition[] {
 export function resolveTemplate(id: string): TemplateResolution {
   return getTemplateRegistry().resolve(id);
 }
+

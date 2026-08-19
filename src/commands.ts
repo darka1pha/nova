@@ -114,6 +114,9 @@ export interface ProjectStatus {
     api: string;
     testing: string;
     ai: string;
+    storage?: string;
+    realtime?: string;
+    payments?: string;
   };
   hasGit: boolean;
   hasSrcDir: boolean;
@@ -199,6 +202,9 @@ export async function statusProject(targetDir: string): Promise<ProjectStatus> {
       api,
       testing,
       ai,
+      storage: plugins.includes("storage") ? "Multi-Driver Storage" : undefined,
+      realtime: plugins.includes("realtime") ? "Server-Sent Events" : undefined,
+      payments: plugins.includes("payments") ? "Payments Abstraction" : undefined,
     },
     hasGit,
     hasSrcDir,

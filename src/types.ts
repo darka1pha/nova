@@ -38,7 +38,10 @@ export type FeatureKey =
   | "ai"
   | "openai"
   | "anthropic"
-  | "ollama";
+  | "ollama"
+  | "storage"
+  | "realtime"
+  | "payments";
 
 export type FeatureFlags = Record<FeatureKey, boolean>;
 

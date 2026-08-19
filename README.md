@@ -550,34 +550,64 @@ Full reference: `docs/nova-add-command.md` inside any generated project.
 Nova offers full-stack architectural presets and specialized starter templates to generate complete, ready-to-run systems in seconds:
 
 ```bash
-# Create using an official preset
-nova create my-saas --preset saas
-nova create my-ai-app --preset ai
-nova create my-dashboard --preset dashboard
+# Inspect available templates and presets
+nova templates
+nova templates --json
+nova template info saas
+nova presets
 
-# Create using a starter template
+# Create using an official starter template
+nova create my-saas --template saas
+nova create my-store --template ecommerce
+nova create my-blog --template blog
+nova create my-admin --template admin
+nova create my-realtime --template realtime
+nova create my-ai-app --template ai
 nova create my-api-service --template api
+nova create my-minimal --template minimal
+nova create my-mobile-app --template react-native
+
+# Create using an official preset
+nova create my-fullstack-app --preset fullstack
+nova create my-saas-app --preset saas
 ```
+
+### Official Templates (`nova templates`)
+
+| Template | Category | Description | Key Features | Aliases |
+| :--- | :--- | :--- | :--- | :--- |
+| **`minimal`** | Starter | Lean, clean Next.js App Router | TypeScript, Tailwind CSS, shadcn UI, Vitest | `default` |
+| **`saas`** | SaaS | Production-ready subscription SaaS | Better Auth, Drizzle ORM, React Email, Storage, Payments, Sentry, Vitest, Playwright | — |
+| **`admin`** | Dashboard | Enterprise admin dashboard | Better Auth, Drizzle ORM, TanStack Table, Recharts, Zustand, Vitest, Playwright | `dashboard` |
+| **`ecommerce`** | E-commerce | Online storefront & product catalog | Better Auth, Drizzle ORM, TanStack Table, Cart State (Zustand), Payments, Storage, Testing | `store` |
+| **`blog`** | Content | Content publishing & headless CMS | Better Auth, Drizzle ORM, Tiptap Editor, TanStack Table, Storage, TanStack Query, Vitest | `cms` |
+| **`ai`** | AI | Conversational AI platform | Vercel AI SDK, OpenAI/Claude/Ollama streaming, Storage, Chat State (Zustand), Testing | — |
+| **`api`** | Backend | Headless microservice & API backend | tRPC type-safe procedures, OpenAPI contracts, Docker, Health probes, Vitest | — |
+| **`realtime`** | Live App | Interactive real-time streaming app | Server-Sent Events (SSE), Presence & Live Notifications, Redis cache, Drizzle ORM, Zustand | — |
+| **`react-native`** | Mobile | Native cross-platform mobile app | Expo SDK 52, React Native 0.76, TypeScript, Theme Tokens, Safe Area, API Client | `mobile`, `expo` |
 
 ### Official Presets (`nova presets`)
 
-| Preset | Description | Included Plugins |
-| :--- | :--- | :--- |
-| **`fullstack`** | Fullstack Next.js production stack | `drizzle`, `betterAuth`, `trpc`, `tanstackQuery`, `vitest`, `playwright` |
-| **`saas`** | Subscription SaaS starter | `drizzle`, `betterAuth`, `tanstackQuery`, `sentry`, `reactEmail`, `dockerCompose`, `securityHeaders`, `health` |
-| **`ai`** | AI/LLM streaming application | `ai`, `openai`, `tanstackQuery`, `zustand` |
-| **`dashboard`** | Analytics & data visualization | `tanstackTable`, `recharts`, `tanstackQuery`, `zustand` |
-| **`api`** | Microservice & typed backend | `trpc`, `openapi`, `docker`, `health` |
+| Preset | Category | Description | Included Plugins |
+| :--- | :--- | :--- | :--- |
+| **`minimal`** | Starter | Minimal Next.js starter stack | `vitest` |
+| **`fullstack`** | App | Fullstack Next.js production stack | `drizzle`, `betterAuth`, `trpc`, `tanstackQuery`, `vitest`, `playwright` |
+| **`saas`** | SaaS | Subscription SaaS platform | `drizzle`, `betterAuth`, `tanstackQuery`, `sentry`, `reactEmail`, `storage`, `payments`, `dockerCompose`, `securityHeaders`, `health`, `vitest`, `playwright` |
+| **`admin`** | Dashboard | Enterprise admin dashboard | `betterAuth`, `drizzle`, `tanstackTable`, `recharts`, `tanstackQuery`, `zustand`, `vitest`, `playwright` |
+| **`dashboard`** | Analytics | Data visualization dashboard | `tanstackTable`, `recharts`, `tanstackQuery`, `zustand`, `vitest` |
+| **`ecommerce`** | E-commerce | Online store platform | `drizzle`, `betterAuth`, `tanstackTable`, `tanstackQuery`, `zustand`, `payments`, `storage`, `vitest`, `playwright` |
+| **`blog`** | Content | Content management platform | `drizzle`, `betterAuth`, `tiptap`, `tanstackTable`, `storage`, `tanstackQuery`, `vitest` |
+| **`ai`** | AI | AI & LLM streaming application | `ai`, `openai`, `betterAuth`, `storage`, `tanstackQuery`, `zustand`, `vitest` |
+| **`api`** | API | Microservice & typed backend | `trpc`, `openapi`, `docker`, `health`, `vitest` |
+| **`realtime`** | Real-time | Live streaming & events | `realtime`, `betterAuth`, `drizzle`, `redis`, `zustand`, `tanstackQuery`, `vitest` |
 
-### Official Templates (`nova template list`)
+### Reusable Feature Plugins
 
-| Template | Focus | Architecture |
-| :--- | :--- | :--- |
-| **`default`** | Clean Next.js | Next.js App Router, Tailwind CSS, TypeScript |
-| **`saas`** | SaaS Platform | SaaS preset + shadcn UI |
-| **`ai`** | Conversational AI | AI preset + Vercel AI SDK + React Chat UI |
-| **`dashboard`** | Data Visualization | Dashboard preset + Data Tables & Charts |
-| **`api`** | API Backend | API preset + Headless App Router |
+Nova provides official reusable plugins that can be added to any project at any time via `nova add <plugin>`:
+
+- **`storage`** — Unified multi-driver file uploads and asset management supporting Local filesystem, AWS S3, and Supabase Storage.
+- **`realtime`** — Server-Sent Events (SSE), live notification center component, and broadcast event streaming.
+- **`payments`** — Payment provider abstraction architecture (Stripe, LemonSqueezy, Paddle, Mock) with checkout sessions, pricing tables, and webhook routing.
 
 ---
 

@@ -691,6 +691,15 @@ async function runMaintenanceCommand(command: string, args: string[]) {
       if (status.architecture.ai !== "None") {
         console.log(`  ${pc.cyan("AI:")}             ${status.architecture.ai}`);
       }
+      if (status.architecture.storage) {
+        console.log(`  ${pc.cyan("Storage:")}        ${status.architecture.storage}`);
+      }
+      if (status.architecture.realtime) {
+        console.log(`  ${pc.cyan("Real-time:")}      ${status.architecture.realtime}`);
+      }
+      if (status.architecture.payments) {
+        console.log(`  ${pc.cyan("Payments:")}       ${status.architecture.payments}`);
+      }
       console.log(`  ${pc.cyan("Plugins:")}        ${status.pluginsCount}`);
       console.log(`  ${pc.cyan("Package Manager:")} ${status.packageManager}`);
       console.log(`  ${pc.cyan("Nova:")}           ${status.novaVersion}`);
@@ -977,6 +986,7 @@ export async function run() {
   let presetArg: string | undefined;
   let uiArg: UiLibrary | undefined;
   let pmArg: PackageManager | undefined;
+  let ormArg: string | undefined;
   let yesArg = false;
   let projectNameArg: string | undefined;
   const featuresArg: string[] = [];
@@ -991,11 +1001,19 @@ export async function run() {
       uiArg = createArgs[++i] as UiLibrary;
     } else if (arg === "--package-manager" || arg === "--pm") {
       pmArg = createArgs[++i] as PackageManager;
+    } else if (arg === "--orm") {
+      ormArg = createArgs[++i];
     } else if (arg === "--yes" || arg === "-y") {
       yesArg = true;
     } else if (arg === "--features") {
       const feats = createArgs[++i]?.split(",") ?? [];
       featuresArg.push(...feats);
+    } else if (arg.startsWith("--")) {
+      const flagName = arg.slice(2);
+      const resolvedFeat = resolveFeatureKey(flagName);
+      if (resolvedFeat) {
+        featuresArg.push(resolvedFeat);
+      }
     } else if (!arg.startsWith("-") && !projectNameArg) {
       projectNameArg = arg;
     }
@@ -1013,6 +1031,7 @@ export async function run() {
       preset: presetArg,
       uiLibrary: uiArg,
       packageManager: pmArg,
+      orm: ormArg,
       yes: yesArg,
       features: featuresArg,
     });
