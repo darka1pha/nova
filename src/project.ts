@@ -157,9 +157,112 @@ export function migrateManifest(raw: unknown, defaultDirName = "app"): NovaProje
 }
 
 /**
- * Reads project manifest from `.nova/project.json` or fallback `.nova.json`.
+ * Introspects project dependencies and codebase structure to infer active plugins
+ * if the project manifest is missing or corrupted.
  */
-export async function readProjectConfig(targetDir: string): Promise<NovaProjectConfig | undefined> {
+export function inferProjectPlugins(pkg: Record<string, unknown>, targetDir?: string): FeatureKey[] {
+  const deps = {
+    ...((pkg.dependencies as Record<string, string>) ?? {}),
+    ...((pkg.devDependencies as Record<string, string>) ?? {}),
+  };
+  const inferred = new Set<FeatureKey>();
+
+  if (deps["drizzle-orm"] || deps["drizzle-kit"]) inferred.add("drizzle");
+  if (deps["@prisma/client"] || deps["prisma"]) inferred.add("prisma");
+  if (deps["@trpc/server"] || deps["@trpc/client"] || deps["@trpc/react-query"]) inferred.add("trpc");
+  if (deps["better-auth"]) inferred.add("betterAuth");
+  if (deps["@supabase/supabase-js"] || deps["@supabase/ssr"]) inferred.add("supabase");
+  if (deps["ai"]) inferred.add("ai");
+  if (deps["@ai-sdk/openai"]) inferred.add("openai");
+  if (deps["@ai-sdk/anthropic"]) inferred.add("anthropic");
+  if (deps["ollama-ai-provider"]) inferred.add("ollama");
+  if (deps["ioredis"] || deps["@upstash/redis"]) inferred.add("redis");
+  if (deps["@sentry/nextjs"]) inferred.add("sentry");
+  if (deps["vitest"]) inferred.add("vitest");
+  if (deps["@playwright/test"]) inferred.add("playwright");
+  if (deps["cypress"]) inferred.add("cypress");
+  if (deps["storybook"]) inferred.add("storybook");
+  if (deps["@react-email/components"] || deps["resend"]) inferred.add("reactEmail");
+  if (deps["@tanstack/react-query"]) inferred.add("tanstackQuery");
+  if (deps["@tanstack/react-table"]) inferred.add("tanstackTable");
+  if (deps["@tiptap/react"] || deps["@tiptap/pm"]) inferred.add("tiptap");
+  if (deps["recharts"]) inferred.add("recharts");
+  if (deps["graphql"] || deps["@apollo/client"]) inferred.add("graphql");
+  if (deps["msw"]) inferred.add("msw");
+  if (deps["zustand"]) inferred.add("zustand");
+  if (deps["framer-motion"]) inferred.add("animations");
+  if (deps["@ducanh2912/next-pwa"] || deps["next-pwa"]) inferred.add("pwa");
+  if (deps["husky"] || deps["lint-staged"]) inferred.add("husky");
+  if (deps["@next/bundle-analyzer"]) inferred.add("bundleAnalyzer");
+  if (deps["openapi-typescript"] || deps["swagger-ui-react"]) inferred.add("openapi");
+
+  if (targetDir) {
+    if (fs.existsSync(path.join(targetDir, "Dockerfile")) || fs.existsSync(path.join(targetDir, "Dockerfile.prod"))) {
+      inferred.add("docker");
+    }
+    if (fs.existsSync(path.join(targetDir, "docker-compose.yml"))) {
+      inferred.add("dockerCompose");
+    }
+    if (fs.existsSync(path.join(targetDir, "src/app/api/health")) || fs.existsSync(path.join(targetDir, "src/app/health"))) {
+      inferred.add("health");
+    }
+    if (fs.existsSync(path.join(targetDir, "src/lib/storage")) || fs.existsSync(path.join(targetDir, "src/app/api/upload"))) {
+      inferred.add("storage");
+    }
+    if (fs.existsSync(path.join(targetDir, "src/lib/realtime")) || fs.existsSync(path.join(targetDir, "src/app/api/realtime"))) {
+      inferred.add("realtime");
+    }
+    if (fs.existsSync(path.join(targetDir, "src/lib/payments")) || fs.existsSync(path.join(targetDir, "src/app/api/webhooks/payments"))) {
+      inferred.add("payments");
+    }
+  }
+
+  return [...inferred].sort();
+}
+
+/**
+ * Reconstructs a complete project configuration and manifests (.nova/project.json & .nova.json)
+ * by analyzing package.json and filesystem markers.
+ */
+export async function reconstructProjectConfig(targetDir: string): Promise<NovaProjectConfig> {
+  const pkg = await readProjectPackage(targetDir);
+  const pm = await detectProjectPackageManager(targetDir);
+  const ui = detectProjectUiLibrary(pkg);
+  const projectType = detectProjectType(pkg);
+  const inferredPlugins = inferProjectPlugins(pkg, targetDir);
+
+  const pluginVersions: Record<string, string> = {};
+  for (const p of inferredPlugins) {
+    pluginVersions[p] = "1.0.0";
+  }
+
+  const config: NovaProjectConfig = {
+    $schema: "https://nova.dev/schema/project.json",
+    version: 1,
+    schemaVersion: 1,
+    name: String(pkg.name ?? path.basename(targetDir)),
+    novaVersion: getNovaCliVersion(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    packageManager: pm,
+    uiLibrary: ui,
+    projectType,
+    plugins: inferredPlugins,
+    pluginVersions,
+  };
+
+  await writeProjectConfig(targetDir, config);
+  return config;
+}
+
+/**
+ * Reads project manifest from `.nova/project.json` or fallback `.nova.json`.
+ * If missing and autoReconstruct is true, reconstructs the configuration from package.json.
+ */
+export async function readProjectConfig(
+  targetDir: string,
+  options: { autoReconstruct?: boolean } = {},
+): Promise<NovaProjectConfig | undefined> {
   const primaryPath = path.join(targetDir, NOVA_MANIFEST_FILE);
   if (await fs.pathExists(primaryPath)) {
     try {
@@ -175,6 +278,14 @@ export async function readProjectConfig(targetDir: string): Promise<NovaProjectC
     try {
       const raw = await fs.readJson(legacyPath);
       return migrateManifest(raw, path.basename(targetDir));
+    } catch {
+      // Fall through
+    }
+  }
+
+  if (options.autoReconstruct) {
+    try {
+      return await reconstructProjectConfig(targetDir);
     } catch {
       return undefined;
     }

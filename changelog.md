@@ -6,6 +6,19 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ---
 
+## [0.2.4] - 2026-08-19
+
+### Added
+
+- **Phase 4: Project Migration, Upgrade Automation & Self-Healing**:
+  - **Manifest Reconstruction & Inferred Discovery**: Automatically detects active plugins, package manager, and UI framework from `package.json` and codebase structure to reconstruct `.nova/project.json` and `.nova.json` if corrupted or untracked.
+  - **Automated Project Migration Engine**: Implemented `runProjectMigrations` and `PROJECT_MIGRATIONS` (`src/migrations/index.ts`) with Next.js 16 Edge proxy migration, schema v1 normalization, and env template hygiene.
+  - **Advanced Self-Healing in `nova repair`**: Restores missing configuration files (`tsconfig.json`, `.gitignore`, `.env.example`), repairs missing plugin scripts in `package.json`, and applies pending project migrations automatically.
+  - **Plugin Lifecycle Hooks & Upgrade Pipeline**: Extended `PluginHooks` with `beforeRemove`, `afterRemove`, `beforeUpgrade`, and `afterUpgrade` parameterized hooks for seamless version migrations.
+  - **Deep Doctor Compatibility Diagnostics**: `nova doctor` now validates Node.js and Nova CLI compatibility ranges across all installed plugins.
+
+---
+
 ## [0.2.3] - 2026-08-19
 
 ### Added

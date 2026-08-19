@@ -595,6 +595,69 @@ assert.ok(beforeUpgradeCalled, "beforeUpgrade hook must be invoked");
 assert.ok(afterUpgradeCalled, "afterUpgrade hook must be invoked");
 console.log("✓ Advanced plugin upgrade & lifecycle hooks verified");
 
+// 19. Phase 4: Manifest Reconstruction & Self-Healing Unit Tests
+import { inferProjectPlugins, reconstructProjectConfig } from "../src/project.js";
+import { runProjectMigrations } from "../src/migrations/index.js";
+import { repairProject } from "../src/commands.js";
+
+const mockPkg = {
+  name: "untracked-app",
+  dependencies: {
+    next: "^15.1.0",
+    react: "^19.0.0",
+    "drizzle-orm": "^0.38.0",
+    "better-auth": "^1.1.0",
+    ai: "^4.0.0",
+    "@ai-sdk/openai": "^1.0.0",
+    ioredis: "^5.4.0",
+  },
+  devDependencies: {
+    typescript: "^5.7.0",
+    vitest: "^3.0.0",
+  },
+};
+
+const inferred = inferProjectPlugins(mockPkg);
+assert.ok(inferred.includes("drizzle"));
+assert.ok(inferred.includes("betterAuth"));
+assert.ok(inferred.includes("ai"));
+assert.ok(inferred.includes("openai"));
+assert.ok(inferred.includes("redis"));
+assert.ok(inferred.includes("vitest"));
+assert.ok(!inferred.includes("prisma"));
+console.log("✓ Inferred plugin detection from dependencies passed");
+
+const reconTmpDir = path.join(os.tmpdir(), "nova-recon-test-" + Date.now());
+await fs.ensureDir(reconTmpDir);
+
+try {
+  await fs.writeJson(path.join(reconTmpDir, "package.json"), mockPkg);
+  const reconConfig = await reconstructProjectConfig(reconTmpDir);
+
+  assert.equal(reconConfig.name, "untracked-app");
+  assert.ok(reconConfig.plugins.includes("drizzle"));
+  assert.ok(reconConfig.plugins.includes("betterAuth"));
+  assert.ok(await fs.pathExists(path.join(reconTmpDir, ".nova/project.json")));
+  assert.ok(await fs.pathExists(path.join(reconTmpDir, ".nova.json")));
+
+  // Test self-healing repair of missing tsconfig
+  assert.ok(!(await fs.pathExists(path.join(reconTmpDir, "tsconfig.json"))));
+  const repairRes = await repairProject(reconTmpDir);
+  assert.ok(repairRes.repairedFiles.includes("tsconfig.json"));
+  assert.ok(await fs.pathExists(path.join(reconTmpDir, "tsconfig.json")));
+
+  // Test migration runner
+  await fs.outputFile(path.join(reconTmpDir, "src", "middleware.ts"), "// legacy");
+  const migrationRes = await runProjectMigrations(reconTmpDir);
+  assert.ok(migrationRes.results.some((r) => r.migrationId === "proxy-migration" && r.applied));
+  assert.ok(await fs.pathExists(path.join(reconTmpDir, "src/proxy.ts")));
+  assert.ok(!(await fs.pathExists(path.join(reconTmpDir, "src/middleware.ts"))));
+
+  console.log("✓ Manifest reconstruction, auto-repair, and migration engine verified");
+} finally {
+  await fs.remove(reconTmpDir).catch(() => {});
+}
+
 // ── Package Resolution Tests ──────────────────────────────────────
 
 import { collectBaseRequirements, collectFeatureRequirements, getBaseDependencyNames } from "../src/resolver/packageRequirements.js";

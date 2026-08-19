@@ -23,6 +23,7 @@ import { ProjectTransaction } from "./utils/transaction.js";
 import { PackageResolver } from "./resolver/index.js";
 import { collectFeatureRequirements, getBaseDependencyNames } from "./resolver/packageRequirements.js";
 import { buildPackageJson } from "./packageManifest.js";
+import { runProjectMigrations } from "./migrations/index.js";
 
 export interface ProjectCommandArgs {
   targetDir: string;
@@ -70,7 +71,7 @@ export function parseProjectCommandArgs(args: string[]): ProjectCommandArgs | { 
 
 async function getProject(targetDir: string): Promise<{ pkg: Record<string, unknown>; config: NovaProjectConfig }> {
   const pkg = await readProjectPackage(targetDir);
-  const config = (await readProjectConfig(targetDir)) ?? (await initializeProjectConfig(targetDir));
+  const config = (await readProjectConfig(targetDir, { autoReconstruct: true })) ?? (await initializeProjectConfig(targetDir));
   return { pkg, config };
 }
 
@@ -875,6 +876,9 @@ export async function upgradeProject(targetDir: string, options: UpgradeOptions 
         updatedAt: new Date().toISOString(),
       });
 
+      // Apply project migrations
+      await runProjectMigrations(targetDir, { dryRun: false });
+
       for (const id of targetPlugins) {
         const plugin = registry.getPlugin(id);
         if (!plugin) continue;
@@ -993,13 +997,51 @@ export async function repairProject(targetDir: string, options: { dryRun?: boole
       }
     }
 
-    // 4. Ensure authoritative manifest in .nova/project.json is written and up to date
+    // 4. Repair essential tsconfig.json if missing
+    const tsconfigPath = path.join(targetDir, "tsconfig.json");
+    if (!(await fs.pathExists(tsconfigPath))) {
+      if (!dryRun) {
+        const defaultTsconfig = {
+          compilerOptions: {
+            target: "ES2022",
+            lib: ["dom", "dom.iterable", "esnext"],
+            allowJs: true,
+            skipLibCheck: true,
+            strict: true,
+            noEmit: true,
+            esModuleInterop: true,
+            module: "esnext",
+            moduleResolution: "bundler",
+            resolveJsonModule: true,
+            isolatedModules: true,
+            jsx: "preserve",
+            incremental: true,
+            plugins: [{ name: "next" }],
+            paths: { "@/*": ["./src/*"] },
+          },
+          include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+          exclude: ["node_modules"],
+        };
+        await fs.writeJson(tsconfigPath, defaultTsconfig, { spaces: 2 });
+      }
+      repairedFiles.push("tsconfig.json");
+    }
+
+    // 5. Ensure authoritative manifest in .nova/project.json is written and up to date
     if (!dryRun) {
       await transaction.snapshotFile(".nova/project.json");
       await transaction.snapshotFile(".nova.json");
       await writeProjectConfig(targetDir, config);
     }
     repairedFiles.push(NOVA_MANIFEST_FILE);
+
+    // 6. Run applicable project migrations
+    const migrationResult = await runProjectMigrations(targetDir, { dryRun });
+    for (const step of migrationResult.results) {
+      if (step.applied) {
+        repairedFiles.push(`Migration: ${step.name}`);
+      }
+    }
 
     if (!dryRun) {
       transaction.commit();
