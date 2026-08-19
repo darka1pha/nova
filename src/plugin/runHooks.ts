@@ -31,6 +31,24 @@ export async function runPluginHook(
     const plugin = registry.getPlugin(id);
     const handler = plugin?.hooks?.[hookName];
     if (!handler) continue;
-    await handler(ctx);
+    if (hookName === "beforeUpgrade" || hookName === "afterUpgrade") {
+      // Handled via runPluginUpgradeHook for parameterized from/to versions
+      continue;
+    }
+    await (handler as (ctx: PluginResolutionContext) => void | Promise<void>)(ctx);
   }
 }
+
+export async function runPluginUpgradeHook(
+  hookName: "beforeUpgrade" | "afterUpgrade",
+  pluginId: PluginId,
+  fromVersion: string,
+  toVersion: string,
+  registry: PluginRegistry,
+  ctx: PluginResolutionContext,
+): Promise<void> {
+  const plugin = registry.getPlugin(pluginId);
+  const handler = plugin?.hooks?.[hookName];
+  if (!handler) return;
+  await handler(fromVersion, toVersion, ctx);
+}

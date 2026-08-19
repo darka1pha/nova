@@ -155,6 +155,10 @@ export interface PluginHooks {
   afterPatch?: (ctx: PluginResolutionContext) => void | Promise<void>;
   beforeInstall?: (ctx: PluginResolutionContext) => void | Promise<void>;
   afterInstall?: (ctx: PluginResolutionContext) => void | Promise<void>;
+  beforeRemove?: (ctx: PluginResolutionContext) => void | Promise<void>;
+  afterRemove?: (ctx: PluginResolutionContext) => void | Promise<void>;
+  beforeUpgrade?: (fromVersion: string, toVersion: string, ctx: PluginResolutionContext) => void | Promise<void>;
+  afterUpgrade?: (fromVersion: string, toVersion: string, ctx: PluginResolutionContext) => void | Promise<void>;
   beforeComplete?: (ctx: PluginResolutionContext) => void | Promise<void>;
   afterComplete?: (ctx: PluginResolutionContext) => void | Promise<void>;
 }

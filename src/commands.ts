@@ -4,6 +4,8 @@ import semver from "semver";
 
 import { getPluginInfo, listAllPluginInfo } from "./generator/pluginInfo.js";
 import { getPluginRegistry } from "./plugin/legacyAdapter.js";
+import { runPluginHook, runPluginUpgradeHook } from "./plugin/runHooks.js";
+import type { PluginResolutionContext } from "./plugin/types.js";
 import { validatePlugins } from "./plugin/validate.js";
 import {
   getNovaCliVersion,
@@ -477,7 +479,30 @@ export async function doctorProject(targetDir: string): Promise<DoctorResult> {
       addCheck("Plugins", "error", err);
     }
   } else {
-    addCheck("Plugins", "pass", `All ${config.plugins.length} active plugins passed validation.`);
+    addCheck("Plugins", "pass", `All ${config.plugins.length} active plugins passed structural validation.`);
+  }
+
+  // 8. Plugin Runtime & Compatibility Diagnostics
+  const registry = getPluginRegistry();
+  const nodeVersionClean = process.version.replace(/^v/, "");
+  for (const pluginId of config.plugins) {
+    const manifest = registry.getPlugin(pluginId);
+    if (manifest?.compatibility) {
+      if (manifest.compatibility.node && !semver.satisfies(nodeVersionClean, manifest.compatibility.node)) {
+        addCheck(
+          "Plugins",
+          "warn",
+          `Plugin "${manifest.name || pluginId}" requires Node.js range "${manifest.compatibility.node}", but current runtime is ${process.version}.`,
+        );
+      }
+      if (manifest.compatibility.nova && !semver.satisfies(getNovaCliVersion(), manifest.compatibility.nova)) {
+        addCheck(
+          "Plugins",
+          "warn",
+          `Plugin "${manifest.name || pluginId}" requires Nova CLI range "${manifest.compatibility.nova}", but current Nova CLI is ${getNovaCliVersion()}.`,
+        );
+      }
+    }
   }
 
   const passed = checks.filter((c) => c.status === "pass").length;
@@ -811,6 +836,27 @@ export async function upgradeProject(targetDir: string, options: UpgradeOptions 
     }
   }
 
+  const pluginContext: PluginResolutionContext = {
+    projectName: String(pkg.name ?? path.basename(targetDir)),
+    packageManager: config.packageManager,
+    uiLibrary: (config.uiLibrary ?? "shadcn") as UiLibrary,
+    enabledPlugins: config.plugins,
+    answers: {},
+  };
+
+  const updatedPluginVersions = { ...(config.pluginVersions ?? {}) };
+  for (const id of targetPlugins) {
+    const plugin = registry.getPlugin(id);
+    if (!plugin) continue;
+    const oldVersion = updatedPluginVersions[id] ?? "1.0.0";
+    if (plugin.version && plugin.version !== oldVersion) {
+      if (!dryRun) {
+        await runPluginUpgradeHook("beforeUpgrade", id, oldVersion, plugin.version, registry, pluginContext);
+      }
+      updatedPluginVersions[id] = plugin.version;
+    }
+  }
+
   if (!dryRun) {
     const transaction = new ProjectTransaction(targetDir);
     transaction.begin();
@@ -822,7 +868,22 @@ export async function upgradeProject(targetDir: string, options: UpgradeOptions 
       if (updatedDependencies.length || updatedDevDependencies.length || addedScripts.length) {
         await fs.writeJson(path.join(targetDir, "package.json"), pkg, { spaces: 2 });
       }
-      await writeProjectConfig(targetDir, config);
+      await writeProjectConfig(targetDir, {
+        ...config,
+        pluginVersions: updatedPluginVersions,
+        novaVersion: getNovaCliVersion(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      for (const id of targetPlugins) {
+        const plugin = registry.getPlugin(id);
+        if (!plugin) continue;
+        const oldVersion = config.pluginVersions?.[id] ?? "1.0.0";
+        if (plugin.version && plugin.version !== oldVersion) {
+          await runPluginUpgradeHook("afterUpgrade", id, oldVersion, plugin.version, registry, pluginContext);
+        }
+      }
+
       transaction.commit();
     } catch (error) {
       await transaction.rollback();
@@ -987,10 +1048,22 @@ export async function removePlugins(
   if (!removed.length) return { removed, skipped, dryRun };
 
   const remaining = config.plugins.filter((plugin) => !removed.includes(plugin));
+  const uiLibrary = (config.uiLibrary ?? "shadcn") as UiLibrary;
+
+  const pluginContext: PluginResolutionContext = {
+    projectName: String(pkg.name ?? path.basename(targetDir)),
+    packageManager: config.packageManager,
+    uiLibrary,
+    enabledPlugins: config.plugins,
+    answers: {},
+  };
+
+  if (!dryRun) {
+    await runPluginHook("beforeRemove", removed, registry, pluginContext);
+  }
 
   // Clean dependencies and scripts that are not required by any remaining plugin
   // Also protect base project dependencies (react, next, typescript, etc.)
-  const uiLibrary = (config.uiLibrary ?? "shadcn") as UiLibrary;
   const baseDeps = getBaseDependencyNames(uiLibrary);
   const remainingDependencies = new Set<string>();
   const remainingDevDependencies = new Set<string>();
@@ -1022,6 +1095,12 @@ export async function removePlugins(
     }
   }
 
+  // Clean pluginVersions in config
+  const updatedPluginVersions = { ...(config.pluginVersions ?? {}) };
+  for (const plugin of removed) {
+    delete updatedPluginVersions[plugin];
+  }
+
   if (!dryRun) {
     const transaction = new ProjectTransaction(targetDir);
     transaction.begin();
@@ -1031,7 +1110,18 @@ export async function removePlugins(
       await transaction.snapshotFile(".nova.json");
 
       await fs.writeJson(path.join(targetDir, "package.json"), pkg, { spaces: 2 });
-      await writeProjectConfig(targetDir, { ...config, plugins: remaining });
+      await writeProjectConfig(targetDir, {
+        ...config,
+        plugins: remaining,
+        pluginVersions: updatedPluginVersions,
+        updatedAt: new Date().toISOString(),
+      });
+
+      await runPluginHook("afterRemove", removed, registry, {
+        ...pluginContext,
+        enabledPlugins: remaining,
+      });
+
       transaction.commit();
     } catch (error) {
       await transaction.rollback();

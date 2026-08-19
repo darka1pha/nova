@@ -553,6 +553,48 @@ try {
   await fs.remove(statusTmpDir).catch(() => {});
 }
 
+// 18. Advanced Plugin Lifecycle & Removal / Upgrade Hooks
+import { PluginRegistry } from "../src/plugin/registry.js";
+import { runPluginUpgradeHook } from "../src/plugin/runHooks.js";
+import type { PluginResolutionContext } from "../src/plugin/types.js";
+let beforeUpgradeCalled = false;
+let afterUpgradeCalled = false;
+
+const testRegistry = new PluginRegistry();
+testRegistry.register({
+  id: "test-plugin",
+  name: "Test Plugin",
+  version: "2.0.0",
+  description: "Test",
+  category: "developer-experience",
+  hooks: {
+    beforeUpgrade: async (fromVer, toVer) => {
+      assert.equal(fromVer, "1.0.0");
+      assert.equal(toVer, "2.0.0");
+      beforeUpgradeCalled = true;
+    },
+    afterUpgrade: async (fromVer, toVer) => {
+      assert.equal(fromVer, "1.0.0");
+      assert.equal(toVer, "2.0.0");
+      afterUpgradeCalled = true;
+    },
+  },
+});
+
+const testCtx: PluginResolutionContext = {
+  projectName: "test",
+  packageManager: "pnpm",
+  uiLibrary: "shadcn",
+  enabledPlugins: ["test-plugin"],
+  answers: {},
+};
+
+await runPluginUpgradeHook("beforeUpgrade", "test-plugin", "1.0.0", "2.0.0", testRegistry, testCtx);
+await runPluginUpgradeHook("afterUpgrade", "test-plugin", "1.0.0", "2.0.0", testRegistry, testCtx);
+assert.ok(beforeUpgradeCalled, "beforeUpgrade hook must be invoked");
+assert.ok(afterUpgradeCalled, "afterUpgrade hook must be invoked");
+console.log("✓ Advanced plugin upgrade & lifecycle hooks verified");
+
 // ── Package Resolution Tests ──────────────────────────────────────
 
 import { collectBaseRequirements, collectFeatureRequirements, getBaseDependencyNames } from "../src/resolver/packageRequirements.js";
