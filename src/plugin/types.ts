@@ -205,6 +205,12 @@ export interface PluginManifest {
   patches?: PatchContribution[];
   prompts?: PromptDefinition[];
   docs?: DocContribution[];
+  infrastructure?: {
+    services?: string[];
+    ports?: number[];
+    healthPath?: string;
+    providers?: string[];
+  };
 
   /** Other plugin ids that must also be selected for this plugin to make sense. */
   requires?: PluginId[];

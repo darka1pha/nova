@@ -20,6 +20,10 @@ export interface TemplateDefinition {
   };
   aliases?: string[];
   starterFiles?: Record<string, string>;
+  infrastructure?: {
+    recommendedProvider?: string;
+    profile?: string;
+  };
 }
 
 export interface TemplateResolution {

@@ -719,6 +719,250 @@ assert.equal(batchResult.resolved.length, 3);
 assert.equal(batchResult.failed.length, 0);
 console.log("✓ Batch resolve handles duplicates");
 
-console.log("\n=========================================");
-console.log("   ALL PHASE 2, PHASE 3 & RESOLVER TESTS PASSED (100%)  ");
-console.log("=========================================\n");
+// -------------------------------------------------------------
+// PHASE 6 UNIT TESTS: Infrastructure as Code & Kubernetes
+// -------------------------------------------------------------
+console.log("\nRunning Phase 6 Unit Tests...\n");
+
+import {
+  getInfrastructureRegistry,
+  getInfrastructureProfile,
+  createDefaultInfrastructureConfig,
+  readInfrastructureConfig,
+  writeInfrastructureConfig,
+  createSecurityScanner,
+  validateStrategy,
+  getDefaultStrategy,
+  validateKubernetesNamespace,
+  validateKubernetesManifests,
+  generateKubernetesManifests,
+  generateTerraformConfig,
+  validateTerraformFiles,
+  type InfrastructureContext,
+} from "../src/infrastructure/index.js";
+
+// 1. Infrastructure Provider Registry
+const infraRegistry = getInfrastructureRegistry();
+assert.ok(infraRegistry.has("kubernetes"), "Registry must have kubernetes");
+assert.ok(infraRegistry.has("terraform"), "Registry must have terraform");
+assert.ok(infraRegistry.has("docker"), "Registry must have docker");
+assert.ok(infraRegistry.has("docker-compose"), "Registry must have docker-compose");
+
+const k8sProvider = infraRegistry.requireProvider("kubernetes");
+assert.equal(k8sProvider.id, "kubernetes");
+assert.equal(k8sProvider.name, "Kubernetes");
+
+const tfProvider = infraRegistry.requireProvider("terraform");
+assert.equal(tfProvider.id, "terraform");
+
+assert.throws(() => infraRegistry.requireProvider("unknown-provider"), /Unknown infrastructure provider/);
+console.log("✓ Infrastructure provider registry registration and lookup passed");
+
+// 2. Infrastructure Profiles and Configuration
+const prodProfile = getInfrastructureProfile("production");
+assert.equal(prodProfile.replicas, 3);
+assert.equal(prodProfile.security.runAsNonRoot, true);
+assert.equal(prodProfile.security.readOnlyRootFilesystem, true);
+assert.equal(prodProfile.autoscaling?.enabled, true);
+
+const minimalProfile = getInfrastructureProfile("minimal");
+assert.equal(minimalProfile.replicas, 1);
+
+const infraTmpDir = path.join(os.tmpdir(), "nova-infra-unit-" + Date.now());
+await fs.ensureDir(infraTmpDir);
+
+try {
+  const infraConfig = createDefaultInfrastructureConfig({
+    appName: "test-k8s-app",
+    provider: "kubernetes",
+    environment: "production",
+    profile: "production",
+  });
+  assert.equal(infraConfig.provider, "kubernetes");
+  assert.equal(infraConfig.environment, "production");
+  assert.equal(infraConfig.settings.appName, "test-k8s-app");
+
+  await writeInfrastructureConfig(infraTmpDir, infraConfig);
+  const readBack = await readInfrastructureConfig(infraTmpDir);
+  assert.ok(readBack);
+  assert.equal(readBack?.provider, "kubernetes");
+  assert.equal(readBack?.settings.appName, "test-k8s-app");
+
+  console.log("✓ Infrastructure profiles and .nova/infrastructure.json config passed");
+
+  // 3. Kubernetes Manifest Generation & Security Context
+  const testContext: InfrastructureContext = {
+    targetDir: infraTmpDir,
+    projectName: "test-k8s-app",
+    packageManager: "pnpm",
+    uiLibrary: "shadcn",
+    plugins: ["drizzle", "betterAuth", "redis"],
+    config: infraConfig,
+  };
+
+  const manifests = generateKubernetesManifests(testContext);
+  assert.ok(manifests.deployment.includes("kind: Deployment"));
+  assert.ok(manifests.deployment.includes("runAsNonRoot: true"));
+  assert.ok(manifests.deployment.includes("readinessProbe:"));
+  assert.ok(manifests.deployment.includes("livenessProbe:"));
+  assert.ok(manifests.service.includes("kind: Service"));
+  assert.ok(manifests.configMap.includes("kind: ConfigMap"));
+  assert.ok(manifests.secret.includes("kind: Secret"));
+  assert.ok(manifests.ingress.includes("kind: Ingress"));
+  assert.ok(manifests.ingress.includes("tls:"));
+  assert.ok(manifests.hpa?.includes("kind: HorizontalPodAutoscaler"));
+  assert.ok(manifests.kustomization.includes("kind: Kustomization"));
+
+  console.log("✓ Kubernetes manifest generation with secure defaults passed");
+
+  // 4. Kubernetes Validation and DNS-1123 Namespaces
+  assert.equal(validateKubernetesNamespace("valid-namespace-1").valid, true);
+  assert.equal(validateKubernetesNamespace("Invalid_Namespace!").valid, false);
+  assert.equal(validateKubernetesNamespace("-invalid-start").valid, false);
+
+  const manifestVal = validateKubernetesManifests({
+    "deployment.yaml": manifests.deployment,
+    "service.yaml": manifests.service,
+    "configmap.yaml": manifests.configMap,
+    "secret.yaml": manifests.secret,
+    "ingress.yaml": manifests.ingress,
+  });
+  assert.equal(manifestVal.ok, true);
+  assert.ok(manifestVal.security);
+  assert.ok(manifestVal.security.score >= 80, `Expected security score >= 80, got ${manifestVal.security.score}`);
+
+  console.log("✓ Kubernetes namespace and manifest validator passed");
+
+  // 5. Kubernetes Plan, Apply, Status, Scale, Diff
+  const k8sPlan = await k8sProvider.plan(testContext);
+  assert.equal(k8sPlan.providerId, "kubernetes");
+  assert.equal(k8sPlan.environment, "production");
+  assert.equal(k8sPlan.risk, "high");
+  assert.ok(k8sPlan.summary.create >= 6);
+
+  const k8sApplyResult = await k8sProvider.apply(k8sPlan, testContext, { targetDir: infraTmpDir });
+  assert.equal(k8sApplyResult.success, true);
+  assert.ok(await fs.pathExists(path.join(infraTmpDir, "k8s", "deployment.yaml")));
+  assert.ok(await fs.pathExists(path.join(infraTmpDir, "k8s", "service.yaml")));
+  assert.ok(await fs.pathExists(path.join(infraTmpDir, "k8s", "kustomization.yaml")));
+
+  // Scaling
+  const scaleResult = await k8sProvider.scale!(testContext, {
+    targetDir: infraTmpDir,
+    replicas: 5,
+  });
+  assert.equal(scaleResult.success, true);
+  assert.equal(scaleResult.targetReplicas, 5);
+  const updatedDeployment = await fs.readFile(path.join(infraTmpDir, "k8s", "deployment.yaml"), "utf8");
+  assert.ok(updatedDeployment.includes("replicas: 5"));
+
+  // Diff & Drift
+  const diffResult = await k8sProvider.diff(testContext);
+  assert.equal(diffResult.providerId, "kubernetes");
+  assert.ok(diffResult.resources.length >= 4);
+
+  // Status
+  const statusResult = await k8sProvider.status(testContext);
+  assert.equal(statusResult.healthy, true);
+  assert.ok(statusResult.resources.length >= 4);
+
+  console.log("✓ Kubernetes plan, apply, scaling, diff, and status operations passed");
+
+  // 6. Terraform Provider Generation and Validation
+  const tfConfig = generateTerraformConfig(testContext);
+  assert.ok(tfConfig.mainTf.includes("resource \"aws_apprunner_service\""));
+  assert.ok(tfConfig.mainTf.includes("resource \"aws_ecr_repository\""));
+  assert.ok(tfConfig.variablesTf.includes("variable \"aws_region\""));
+  assert.ok(tfConfig.outputsTf.includes("output \"service_url\""));
+
+  const tfVal = validateTerraformFiles({
+    "main.tf": tfConfig.mainTf,
+    "variables.tf": tfConfig.variablesTf,
+    "outputs.tf": tfConfig.outputsTf,
+  });
+  assert.equal(tfVal.ok, true);
+
+  const tfPlan = await tfProvider.plan(testContext);
+  assert.equal(tfPlan.providerId, "terraform");
+  assert.equal(tfPlan.summary.total, 2);
+
+  console.log("✓ Terraform HCL configuration generation, validation, and planning passed");
+
+  // 7. Security Scanner Rule Checks
+  const scanner = createSecurityScanner();
+  const badManifests = [
+    {
+      kind: "Deployment",
+      metadata: { name: "insecure-app" },
+      spec: {
+        template: {
+          spec: {
+            hostNetwork: true,
+            volumes: [{ name: "host-root", hostPath: { path: "/" } }],
+            containers: [
+              {
+                name: "app",
+                securityContext: { privileged: true, readOnlyRootFilesystem: false },
+              },
+            ],
+          },
+        },
+      },
+    },
+    {
+      kind: "Secret",
+      metadata: { name: "leaked-secret" },
+      spec: {
+        stringData: {
+          API_KEY: "super-secret-unencrypted-key-12345",
+        },
+      },
+    },
+    {
+      kind: "Ingress",
+      metadata: { name: "http-ingress" },
+      spec: {
+        rules: [{ host: "insecure.example.com" }],
+      },
+    },
+  ];
+
+  const secScan = scanner.scanKubernetesManifests(badManifests);
+  assert.equal(secScan.passed, false, "Insecure manifests must fail security scan");
+  assert.ok(secScan.findings.some((f) => f.ruleId === "SEC-001"), "Must detect privileged container (SEC-001)");
+  assert.ok(secScan.findings.some((f) => f.ruleId === "SEC-003"), "Must detect host network (SEC-003)");
+  assert.ok(secScan.findings.some((f) => f.ruleId === "SEC-004"), "Must detect host path mount (SEC-004)");
+  assert.ok(secScan.findings.some((f) => f.ruleId === "SEC-005"), "Must detect plaintext secret (SEC-005)");
+  assert.ok(secScan.findings.some((f) => f.ruleId === "SEC-008"), "Must detect missing Ingress TLS (SEC-008)");
+
+  console.log("✓ Infrastructure security scanner and vulnerability rules passed");
+
+  // 8. Deployment Strategy Validation
+  const rolling = getDefaultStrategy("rolling");
+  assert.equal(validateStrategy(rolling).valid, true);
+
+  const badRolling = { type: "rolling" as const, maxSurge: "25%", maxUnavailable: "100%" };
+  assert.equal(validateStrategy(badRolling).valid, false);
+
+  const canary = getDefaultStrategy("canary");
+  assert.equal(validateStrategy(canary).valid, true);
+
+  const badCanary = {
+    type: "canary" as const,
+    canaryWeightPercentage: 70,
+    stableWeightPercentage: 30,
+    stepPercentage: 10,
+    stepIntervalSeconds: 60,
+    maxFailedHealthChecks: 2,
+  };
+  assert.equal(validateStrategy(badCanary).valid, false);
+
+  console.log("✓ Deployment strategy abstractions (Rolling, Blue/Green, Canary) passed");
+} finally {
+  await fs.remove(infraTmpDir).catch(() => {});
+}
+
+console.log("\n=======================================================");
+console.log("   ALL PHASE 2, PHASE 3, PHASE 4 & PHASE 6 TESTS PASSED  ");
+console.log("=======================================================\n");
+

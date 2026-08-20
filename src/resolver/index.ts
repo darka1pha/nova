@@ -59,8 +59,10 @@ export class PackageResolver {
     const failed: PackageResolutionError[] = [];
 
     // Prefetch all unique package names concurrently
-    const uniqueNames = [...new Set(requirements.map((r) => r.name))];
-    await Promise.allSettled(uniqueNames.map((name) => this.fetchPackageInfo(name)));
+    if (!this.offline) {
+      const uniqueNames = [...new Set(requirements.map((r) => r.name))];
+      await Promise.allSettled(uniqueNames.map((name) => this.fetchPackageInfo(name)));
+    }
 
     // Resolve each requirement
     for (const req of requirements) {

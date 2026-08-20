@@ -6,6 +6,23 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ---
 
+## [0.2.5] - 2026-08-20
+
+### Added
+
+- **Phase 6: Infrastructure as Code, Kubernetes & Advanced Production Operations (`nova infra`)**:
+  - **Pluggable Infrastructure Provider Subsystem**: Extensible `InfrastructureProvider` engine with central registry `InfrastructureProviderRegistry` supporting `kubernetes`, `terraform`, `docker`, and `docker-compose`.
+  - **First-Class Kubernetes Orchestration**: Production-ready manifest generation (`k8s/deployment.yaml`, `k8s/service.yaml`, `k8s/configmap.yaml`, `k8s/secret.yaml`, `k8s/ingress.yaml`, `k8s/hpa.yaml`, `k8s/kustomization.yaml`) with non-root security context, resource limits, readiness/liveness probes, and TLS ingress.
+  - **Terraform Integration**: Vendor-agnostic HCL configuration generator for container runtimes (AWS App Runner, Amazon ECR) with outputs, variables, and `.tfvars.example`.
+  - **Docker & Multi-Service Compose**: Automated multi-stage production containerization with non-root user and multi-service stack with PostgreSQL and Redis.
+  - **Infrastructure Security Scanner**: Static analysis scanner auditing manifests against 10 CIS/Kubernetes hardening benchmarks (`SEC-001` through `SEC-010`) and computing health scores.
+  - **Automated Drift Detection**: `nova infra diff` / `nova infra drift` comparing desired state against live/persisted state and reporting field-level drift.
+  - **Production Safety Controls**: Pre-flight planning (`nova infra plan`), safe dry-runs, interactive approval, and confirmation phrase requirements (`DESTROY PRODUCTION`) for destructive changes.
+  - **Dynamic Scaling**: `nova infra scale --replicas <N>` for scaling application replicas on the fly.
+  - **Infrastructure State Management**: Persisted infrastructure configuration and environment tracking in `.nova/infrastructure.json` with 4 operational profiles (`minimal`, `standard`, `production`, `high-availability`).
+
+---
+
 ## [0.2.4] - 2026-08-19
 
 ### Added

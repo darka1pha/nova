@@ -17,6 +17,7 @@ import { collectAnswers, FEATURE_OPTIONS, isValidProjectName, type CliCreateOpti
 import { runPluginSubcommand } from "./commands/plugin.js";
 import { runTemplateSubcommand } from "./commands/template.js";
 import { runEnvSubcommand } from "./commands/env.js";
+import { runInfraSubcommand } from "./commands/infra.js";
 import { getPluginRegistryManager, formatTrustBadge } from "./registry/index.js";
 import { getProjectEnvStatus } from "./env/manager.js";
 import type { UiLibrary } from "./types.js";
@@ -56,9 +57,9 @@ function readPackageVersion(): string {
   try {
     const pkgPath = path.join(__dirname, "..", "package.json");
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { version?: string };
-    return pkg.version ?? "0.2.4";
+    return pkg.version ?? "0.2.5";
   } catch {
-    return "0.2.4";
+    return "0.2.5";
   }
 }
 
@@ -76,6 +77,7 @@ ${pc.bold("Usage")}
   nova add <feature...> [options]
   nova remove <plugin...> [--path <dir>] [--force]
   nova deploy [provider] [--path <dir>] [--dry-run] [--list]
+  nova infra providers | validate | plan | apply | status | diff | drift | scale | destroy
   nova status | info | doctor | validate | clean | diff | upgrade | repair | packages [--path <dir>]
 
 ${pc.bold("Project Creation Options")}
@@ -102,6 +104,9 @@ ${pc.bold("Examples")}
   nova plugin create my-custom-plugin
   nova env check
   nova deploy vercel --dry-run
+  nova infra plan --provider kubernetes
+  nova infra apply --provider kubernetes
+  nova infra scale --replicas 5
 `);
 }
 
@@ -964,6 +969,36 @@ export async function run() {
     return;
   }
 
+  if (first === "infra" || first === "infrastructure") {
+    try {
+      await runInfraSubcommand(rawArgs.slice(1));
+    } catch (err) {
+      p.log.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (first === "scale") {
+    try {
+      await runInfraSubcommand(["scale", ...rawArgs.slice(1)]);
+    } catch (err) {
+      p.log.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (first === "health") {
+    try {
+      await runMaintenanceCommand("doctor", rawArgs.slice(1));
+    } catch (err) {
+      p.log.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   if (["init", "info", "status", "doctor", "validate", "clean", "diff", "remove", "list", "search", "upgrade", "repair", "packages"].includes(first ?? "")) {
     try {
       await runMaintenanceCommand(first, rawArgs.slice(1));
@@ -1262,6 +1297,7 @@ export {
   runPluginSubcommand,
   runTemplateSubcommand,
   runEnvSubcommand,
+  runInfraSubcommand,
 };
 
 export * from "./registry/index.js";
@@ -1269,6 +1305,8 @@ export * from "./presets/registry.js";
 export * from "./templates/registry.js";
 export * from "./sdk/index.js";
 export * from "./env/manager.js";
+export * from "./infrastructure/index.js";
+export * from "./commands/infra.js";
 
 
 

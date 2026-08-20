@@ -1385,8 +1385,6 @@ When a plugin is added later via `nova add`, remember to also copy over any new 
 
 ## Deployment
 
-## Deployment
-
 Nova provides first-class cloud deployment support through the `nova deploy` command, generating tailored configurations, automated CI/CD workflows, Dockerfiles, and production guides:
 
 ```bash
@@ -1412,6 +1410,71 @@ nova deploy docker
 - **Docker & Self-Hosted**: Generates a production multi-stage `Dockerfile.prod`, `docker-compose.prod.yml`, and reverse proxy guides in `docs/deployment/self-hosted.md`.
 
 Every variable in `.env.example` must be set in production — missing required variables fail fast at boot if you're using the generated `src/config/env.ts` validation.
+
+---
+
+## Infrastructure as Code & Kubernetes (`nova infra`)
+
+Nova Phase 6 introduces vendor-agnostic Infrastructure as Code (IaC), Kubernetes orchestration, and production operations capabilities. You can generate, validate, plan, apply, scale, drift-detect, and monitor cloud-native infrastructure with production-grade safety controls.
+
+```bash
+# List supported infrastructure providers
+nova infra providers
+
+# Run pre-flight security scan and structural validation
+nova infra validate --provider kubernetes
+
+# Preview execution plan with risk analysis and resource changes
+nova infra plan --provider kubernetes
+
+# Apply infrastructure plan (generates manifests or IaC templates)
+nova infra apply --provider kubernetes
+
+# Inspect live/manifest infrastructure status and health
+nova infra status
+
+# Detect configuration drift between state and manifests
+nova infra diff
+nova infra drift
+
+# Dynamically scale application replicas
+nova infra scale --replicas 5
+
+# Safely destroy provisioned infrastructure (requires explicit confirmation)
+nova infra destroy --provider kubernetes
+```
+
+### Supported Infrastructure Providers
+
+| Provider | ID | Generated Assets | Capabilities |
+| :--- | :--- | :--- | :--- |
+| **Kubernetes** | `kubernetes` | `k8s/deployment.yaml`, `k8s/service.yaml`, `k8s/configmap.yaml`, `k8s/secret.yaml`, `k8s/ingress.yaml`, `k8s/hpa.yaml`, `k8s/kustomization.yaml` | Non-root security context, resource limits, health/readiness probes, TLS ingress, HPA autoscaling, zero-downtime rolling updates |
+| **Terraform** | `terraform` | `terraform/main.tf`, `terraform/variables.tf`, `terraform/outputs.tf`, `terraform.tfvars.example` | AWS App Runner service, Amazon ECR repository, automated variables and outputs |
+| **Docker** | `docker` | `Dockerfile.prod` | Multi-stage minimal runner with non-root user and standalone Next.js build |
+| **Docker Compose** | `docker-compose` | `docker-compose.prod.yml` | Multi-service orchestration with PostgreSQL, Redis, health checks, and persistent volumes |
+
+### Infrastructure Security Scanner
+
+Nova includes a built-in infrastructure security scanner auditing Kubernetes manifests and Docker definitions against 10 CIS/Kubernetes hardening benchmarks:
+
+- **SEC-001**: Privileged container execution prevention
+- **SEC-002**: Root user execution prevention (`runAsNonRoot: true`)
+- **SEC-003**: Host network namespace isolation
+- **SEC-004**: Host path filesystem mount restriction
+- **SEC-005**: Plaintext secret detection and safe secret reference enforcement
+- **SEC-006**: Missing CPU/memory resource limits
+- **SEC-007**: Missing liveness/readiness probes
+- **SEC-008**: Insecure Ingress / TLS termination enforcement
+- **SEC-009**: Read-only root filesystem requirement
+- **SEC-010**: Missing Linux capability drops (`drop: ["ALL"]`)
+
+### Infrastructure Profiles
+
+Nova provides 4 pre-tuned operational profiles:
+- **`minimal`**: Single replica (1 pod), basic resource limits, suitable for development and local testing.
+- **`standard`**: 2 replicas, rolling updates (`maxSurge: 25%`, `maxUnavailable: 0%`), health probes.
+- **`production`**: 3+ replicas, strict security context (non-root, read-only root FS, drop ALL capabilities), HPA autoscaling (75% target CPU).
+- **`high-availability`**: 5+ replicas, multi-AZ deployment, strict pod anti-affinity, multi-metric autoscaling.
 
 
 ---

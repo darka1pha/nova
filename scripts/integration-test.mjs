@@ -341,7 +341,75 @@ try {
   const registryManager = getPluginRegistryManager();
   const searchHits = await registryManager.search("ai");
   assert.ok(searchHits.length >= 2, "Must find at least ai and openai");
-  console.log("✓ registry search integration passed");
+  // -------------------------------------------------------------
+  // Phase 6 Integration Scenarios: Infrastructure & Kubernetes
+  // -------------------------------------------------------------
+  const {
+    getInfrastructureRegistry,
+    createDefaultInfrastructureConfig,
+    writeInfrastructureConfig,
+  } = await import("../dist/index.js");
+
+  const infraRegistry = getInfrastructureRegistry();
+  const k8s = infraRegistry.requireProvider("kubernetes");
+  const tf = infraRegistry.requireProvider("terraform");
+
+  const testInfraContext = {
+    targetDir: projectDir,
+    projectName: "test-drizzle-app",
+    packageManager: "pnpm",
+    uiLibrary: "shadcn",
+    plugins: ["drizzle"],
+    config: createDefaultInfrastructureConfig({
+      appName: "test-drizzle-app",
+      provider: "kubernetes",
+      environment: "production",
+      profile: "production",
+    }),
+  };
+
+  // 1. Kubernetes plan and apply
+  const k8sPlan = await k8s.plan(testInfraContext);
+  assert.equal(k8sPlan.providerId, "kubernetes");
+  assert.ok(k8sPlan.summary.create >= 5);
+
+  const k8sApply = await k8s.apply(k8sPlan, testInfraContext, { targetDir: projectDir });
+  assert.equal(k8sApply.success, true);
+  assert.ok(await fs.pathExists(path.join(projectDir, "k8s/deployment.yaml")));
+  assert.ok(await fs.pathExists(path.join(projectDir, "k8s/service.yaml")));
+  assert.ok(await fs.pathExists(path.join(projectDir, "k8s/kustomization.yaml")));
+  console.log("✓ Kubernetes infra plan & apply integration passed");
+
+  // 2. Kubernetes scaling
+  const scale = await k8s.scale(testInfraContext, { targetDir: projectDir, replicas: 6 });
+  assert.equal(scale.targetReplicas, 6);
+  const k8sDepContent = await fs.readFile(path.join(projectDir, "k8s/deployment.yaml"), "utf8");
+  assert.ok(k8sDepContent.includes("replicas: 6"));
+  console.log("✓ Kubernetes infra scaling integration passed");
+
+  // 3. Kubernetes diff and status
+  const k8sStatus = await k8s.status(testInfraContext);
+  assert.equal(k8sStatus.healthy, true);
+  const k8sDiff = await k8s.diff(testInfraContext);
+  assert.equal(k8sDiff.providerId, "kubernetes");
+  console.log("✓ Kubernetes infra status & diff integration passed");
+
+  // 4. Terraform plan and apply
+  const tfContext = {
+    ...testInfraContext,
+    config: createDefaultInfrastructureConfig({
+      appName: "test-drizzle-app",
+      provider: "terraform",
+      environment: "production",
+    }),
+  };
+  const tfPlan = await tf.plan(tfContext);
+  assert.equal(tfPlan.providerId, "terraform");
+  const tfApply = await tf.apply(tfPlan, tfContext, { targetDir: projectDir });
+  assert.equal(tfApply.success, true);
+  assert.ok(await fs.pathExists(path.join(projectDir, "terraform/main.tf")));
+  assert.ok(await fs.pathExists(path.join(projectDir, "terraform/variables.tf")));
+  console.log("✓ Terraform infra plan & apply integration passed");
 
   console.log("ALL INTEGRATION TESTS PASSED");
 } finally {
