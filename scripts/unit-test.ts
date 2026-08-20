@@ -428,7 +428,50 @@ const mobileTpl = resolveTemplate("react-native");
 assert.equal(mobileTpl.valid, true, "React Native template must resolve");
 assert.equal(mobileTpl.template.structure, "react-native");
 
-console.log("✓ Official templates (minimal, saas, admin, ecommerce, blog, ai, api, realtime, react-native) & composition passed");
+// New Templates Resolution Tests
+const multiTenantTpl = resolveTemplate("multi-tenant");
+assert.equal(multiTenantTpl.valid, true, "Multi-tenant template must resolve");
+assert.ok(multiTenantTpl.resolvedPlugins.includes("drizzle"));
+assert.ok(multiTenantTpl.resolvedPlugins.includes("betterAuth"));
+assert.ok(multiTenantTpl.resolvedPlugins.includes("payments"));
+
+const supabaseTpl = resolveTemplate("supabase");
+assert.equal(supabaseTpl.valid, true, "Supabase template must resolve");
+assert.ok(supabaseTpl.resolvedPlugins.includes("supabase"));
+
+const aiAgentTpl = resolveTemplate("ai-agent");
+assert.equal(aiAgentTpl.valid, true, "AI Agent template must resolve");
+assert.ok(aiAgentTpl.resolvedPlugins.includes("ai"));
+assert.ok(aiAgentTpl.resolvedPlugins.includes("openai"));
+assert.ok(aiAgentTpl.resolvedPlugins.includes("anthropic"));
+
+const graphqlTpl = resolveTemplate("graphql-api");
+assert.equal(graphqlTpl.valid, true, "GraphQL API template must resolve");
+assert.ok(graphqlTpl.resolvedPlugins.includes("graphql"));
+assert.ok(graphqlTpl.resolvedPlugins.includes("redis"));
+
+const designSystemTpl = resolveTemplate("design-system");
+assert.equal(designSystemTpl.valid, true, "Design System template must resolve");
+assert.ok(designSystemTpl.resolvedPlugins.includes("storybook"));
+assert.ok(designSystemTpl.resolvedPlugins.includes("animations"));
+
+const pwaTpl = resolveTemplate("pwa");
+assert.equal(pwaTpl.valid, true, "PWA template must resolve");
+assert.ok(pwaTpl.resolvedPlugins.includes("pwa"));
+
+const docsTpl = resolveTemplate("docs");
+assert.equal(docsTpl.valid, true, "Docs template must resolve");
+assert.ok(docsTpl.resolvedPlugins.includes("tiptap"));
+
+const mobileCompanionTpl = resolveTemplate("mobile-fullstack");
+assert.equal(mobileCompanionTpl.valid, true, "Mobile Companion template must resolve");
+assert.ok(mobileCompanionTpl.resolvedPlugins.includes("trpc"));
+
+const portfolioTpl = resolveTemplate("portfolio");
+assert.equal(portfolioTpl.valid, true, "Portfolio template must resolve");
+assert.ok(portfolioTpl.resolvedPlugins.includes("animations"));
+
+console.log("✓ Official templates (18 templates & 19 presets) & composition passed");
 
 // 14b. Comprehensive Template Validation
 import { validateTemplateSystem } from "../src/templates/validator.js";

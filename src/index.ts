@@ -81,8 +81,8 @@ ${pc.bold("Usage")}
   nova status | info | doctor | validate | clean | diff | upgrade | repair | packages [--path <dir>]
 
 ${pc.bold("Project Creation Options")}
-  -t, --template <name>    Template to use: default, saas, ai, dashboard, api, react-native
-  --preset <name>          Preset to apply: fullstack, saas, ai, dashboard, api
+  -t, --template <name>    Template: minimal, saas, multi-tenant, admin, ecommerce, ai, ai-agent, supabase, realtime, graphql-api, api, blog, docs, design-system, pwa, portfolio, react-native
+  --preset <name>          Preset: minimal, fullstack, saas, multi-tenant, admin, dashboard, ecommerce, blog, docs, ai, ai-agent, supabase, realtime, graphql-api, api, design-system, pwa, portfolio
   --ui <library>           UI Library: shadcn, mui, chakra, ant, mantine, hero, daisy, headless
   --pm <manager>           Package manager: pnpm, npm, yarn, bun
   -y, --yes                Non-interactive mode (use defaults)

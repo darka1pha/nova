@@ -578,12 +578,21 @@ nova create my-saas-app --preset saas
 | :--- | :--- | :--- | :--- | :--- |
 | **`minimal`** | Starter | Lean, clean Next.js App Router | TypeScript, Tailwind CSS, shadcn UI, Vitest, Husky | `default` |
 | **`saas`** | SaaS | Production-ready subscription SaaS | Better Auth, Drizzle ORM, React Email, Storage, Payments, Sentry, Vitest, Playwright, Husky | — |
+| **`multi-tenant`** | SaaS | Enterprise B2B multi-tenant platform | Multi-tenancy, Better Auth, Drizzle ORM, Payments, React Email, TanStack Table, TanStack Query, Zustand, Vitest, Playwright, Husky | `b2b-saas`, `multitenant`, `b2b` |
 | **`admin`** | Dashboard | Enterprise admin dashboard | Better Auth, Drizzle ORM, TanStack Table, Recharts, Zustand, Vitest, Playwright, Husky | `dashboard` |
 | **`ecommerce`** | E-commerce | Online storefront & product catalog | Better Auth, Drizzle ORM, TanStack Table, Cart State (Zustand), Payments, Storage, Testing, Husky | `store` |
-| **`blog`** | Content | Content publishing & headless CMS | Better Auth, Drizzle ORM, Tiptap Editor, TanStack Table, Storage, TanStack Query, Vitest, Husky | `cms` |
 | **`ai`** | AI | Conversational AI platform | Vercel AI SDK, OpenAI/Claude/Ollama streaming, Storage, Chat State (Zustand), Testing, Husky | — |
-| **`api`** | Backend | Headless microservice & API backend | tRPC type-safe procedures, OpenAPI contracts, Docker, Health probes, Vitest, Husky | — |
+| **`ai-agent`** | AI | Autonomous AI Agent & RAG system | Vercel AI SDK, OpenAI + Claude routing, Document ingestion, Storage, Drizzle ORM vector schema, Zustand, Vitest, Husky | `rag`, `agent` |
+| **`supabase`** | Fullstack | Supabase fullstack application | Supabase SSR Auth, PostgreSQL, Realtime live subscriptions, Storage uploads, TanStack Query, Zustand, Vitest, Husky | `supabase-starter`, `supabase-app` |
 | **`realtime`** | Live App | Interactive real-time streaming app | Server-Sent Events (SSE), Presence & Live Notifications, Redis cache, Drizzle ORM, Zustand, Husky | — |
+| **`graphql-api`** | Backend | GraphQL microservice & API gateway | GraphQL Yoga server, schema codegen, Drizzle ORM, Redis caching, Docker, Health endpoints, Vitest, Husky | `graphql`, `apollo` |
+| **`api`** | Backend | Headless microservice & API backend | tRPC type-safe procedures, OpenAPI contracts, Docker, Health probes, Vitest, Husky | — |
+| **`blog`** | Content | Content publishing & headless CMS | Better Auth, Drizzle ORM, Tiptap Editor, TanStack Table, Storage, TanStack Query, Vitest, Husky | `cms` |
+| **`docs`** | Content | Developer documentation portal | Tiptap rich content editor, documentation layout, search indexing, TanStack Query, Vitest, Husky | `documentation`, `knowledgebase`, `wiki` |
+| **`design-system`** | UI | Design system & component catalog | Storybook component workshop, Design tokens, Framer Motion animations, Vitest, Husky | `components`, `storybook`, `ui-kit` |
+| **`pwa`** | Mobile/Web | Offline-first Progressive Web App | Service worker caching, App manifest, Zustand persistent store, TanStack Query, Vitest, Husky | `offline-first`, `pwa-app` |
+| **`portfolio`** | Showcase | Developer portfolio & project showcase | Framer Motion animations, Design system tokens, Showcase layout, Vitest, Husky | `showcase`, `resume` |
+| **`mobile-fullstack`** | Mobile/Backend | Fullstack companion for mobile apps | tRPC endpoints, Better Auth, Drizzle ORM, TanStack Query, Vitest, Husky | `cross-platform`, `mobile-web` |
 | **`react-native`** | Mobile | Native cross-platform mobile app | Expo SDK 52, React Native 0.76, TypeScript, Theme Tokens, Safe Area, API Client | `mobile`, `expo` |
 
 ### Official Presets (`nova presets`)
@@ -593,13 +602,22 @@ nova create my-saas-app --preset saas
 | **`minimal`** | Starter | Minimal Next.js starter stack | `vitest`, `husky` |
 | **`fullstack`** | App | Fullstack Next.js production stack | `drizzle`, `betterAuth`, `trpc`, `tanstackQuery`, `vitest`, `playwright`, `husky` |
 | **`saas`** | SaaS | Subscription SaaS platform | `drizzle`, `betterAuth`, `tanstackQuery`, `sentry`, `reactEmail`, `storage`, `payments`, `dockerCompose`, `securityHeaders`, `health`, `vitest`, `playwright`, `husky` |
+| **`multi-tenant`** | SaaS | Enterprise B2B SaaS platform | `drizzle`, `betterAuth`, `payments`, `reactEmail`, `tanstackTable`, `tanstackQuery`, `zustand`, `vitest`, `playwright`, `husky` |
 | **`admin`** | Dashboard | Enterprise admin dashboard | `betterAuth`, `drizzle`, `tanstackTable`, `recharts`, `tanstackQuery`, `zustand`, `vitest`, `playwright`, `husky` |
 | **`dashboard`** | Analytics | Data visualization dashboard | `tanstackTable`, `recharts`, `tanstackQuery`, `zustand`, `vitest`, `husky` |
 | **`ecommerce`** | E-commerce | Online store platform | `drizzle`, `betterAuth`, `tanstackTable`, `tanstackQuery`, `zustand`, `payments`, `storage`, `vitest`, `playwright`, `husky` |
 | **`blog`** | Content | Content management platform | `drizzle`, `betterAuth`, `tiptap`, `tanstackTable`, `storage`, `tanstackQuery`, `vitest`, `husky` |
+| **`docs`** | Content | Documentation & knowledge base | `tiptap`, `tanstackQuery`, `vitest`, `husky` |
 | **`ai`** | AI | AI & LLM streaming application | `ai`, `openai`, `betterAuth`, `storage`, `tanstackQuery`, `zustand`, `vitest`, `husky` |
+| **`ai-agent`** | AI | AI Agent & RAG engine | `ai`, `openai`, `anthropic`, `storage`, `drizzle`, `tanstackQuery`, `zustand`, `vitest`, `husky` |
+| **`supabase`** | App | Supabase fullstack application | `supabase`, `tanstackQuery`, `tanstackTable`, `zustand`, `vitest`, `husky` |
 | **`api`** | API | Microservice & typed backend | `trpc`, `openapi`, `docker`, `health`, `vitest`, `husky` |
+| **`graphql-api`** | API | GraphQL microservice backend | `graphql`, `drizzle`, `redis`, `docker`, `health`, `vitest`, `husky` |
 | **`realtime`** | Real-time | Live streaming & events | `realtime`, `betterAuth`, `drizzle`, `redis`, `zustand`, `tanstackQuery`, `vitest`, `husky` |
+| **`design-system`** | UI | Design system & component workshop | `storybook`, `animations`, `designSystem`, `vitest`, `husky` |
+| **`pwa`** | App | Progressive Web App | `pwa`, `zustand`, `tanstackQuery`, `vitest`, `husky` |
+| **`mobile-fullstack`** | App | Fullstack mobile companion | `trpc`, `betterAuth`, `drizzle`, `tanstackQuery`, `vitest`, `husky` |
+| **`portfolio`** | Showcase | Developer portfolio showcase | `animations`, `designSystem`, `vitest`, `husky` |
 
 ### Reusable Feature Plugins
 
