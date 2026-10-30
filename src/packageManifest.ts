@@ -80,25 +80,28 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
   }
 
   if (uiLibrary === "ant") {
-    dependencies["antd"] = "^5.10.0";
+    dependencies["antd"] = "^5.24.0";
+    dependencies["@ant-design/v5-patch-for-react-19"] = "^1.0.3";
   }
 
   if (uiLibrary === "mantine") {
-    dependencies["@mantine/core"] = "^6.0.0";
-    dependencies["@mantine/hooks"] = "^6.0.0";
+    dependencies["@mantine/core"] = "^7.17.0";
+    dependencies["@mantine/hooks"] = "^7.17.0";
   }
 
   if (uiLibrary === "hero") {
-    dependencies["@nextui-org/react"] = "^1.0.0";
+    // HeroUI 2.8+ requires Tailwind v4; the base template ships Tailwind v3.
+    dependencies["@heroui/react"] = "~2.7.0";
+    dependencies["framer-motion"] = "^11.18.0";
   }
 
   if (uiLibrary === "daisy") {
-    devDependencies["daisyui"] = "^3.1.0";
+    devDependencies["daisyui"] = "^4.12.0";
   }
 
   if (uiLibrary === "headless") {
-    dependencies["@headlessui/react"] = "^1.8.0";
-    dependencies["@heroicons/react"] = "^2.0.18";
+    dependencies["@headlessui/react"] = "^2.2.0";
+    dependencies["@heroicons/react"] = "^2.2.0";
   }
 
   for (const [feature, enabled] of Object.entries(features) as [FeatureKey, boolean][]) {
@@ -114,7 +117,7 @@ export function buildPackageJson({ projectName, features, uiLibrary = "shadcn" }
 
   return {
     name: projectName,
-    version: "0.1.8",
+    version: "0.1.0",
     private: true,
     scripts,
     dependencies: sortKeys(dependencies),

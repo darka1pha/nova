@@ -64,7 +64,7 @@ export async function readProjectPackage(targetDir: string): Promise<Record<stri
 export async function detectProjectPackageManager(targetDir: string): Promise<PackageManager> {
   if (await fs.pathExists(path.join(targetDir, "pnpm-lock.yaml"))) return "pnpm";
   if (await fs.pathExists(path.join(targetDir, "yarn.lock"))) return "yarn";
-  if (await fs.pathExists(path.join(targetDir, "bun.lockb"))) return "bun";
+  if ((await fs.pathExists(path.join(targetDir, "bun.lock"))) || (await fs.pathExists(path.join(targetDir, "bun.lockb")))) return "bun";
   return "npm";
 }
 
@@ -77,7 +77,7 @@ export function detectProjectUiLibrary(pkg: Record<string, unknown>): UiLibrary 
   if (deps["@chakra-ui/react"]) return "chakra";
   if (deps.antd) return "ant";
   if (deps["@mantine/core"]) return "mantine";
-  if (deps["@nextui-org/react"]) return "hero";
+  if (deps["@heroui/react"] || deps["@nextui-org/react"]) return "hero";
   if (deps.daisyui) return "daisy";
   if (deps["@headlessui/react"]) return "headless";
   return "shadcn";

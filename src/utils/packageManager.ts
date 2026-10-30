@@ -16,7 +16,7 @@ export const LOCKFILES: Record<PackageManager, string> = {
 export async function detectPackageManager(targetDir: string): Promise<PackageManager> {
   if (await fs.pathExists(path.join(targetDir, "pnpm-lock.yaml"))) return "pnpm";
   if (await fs.pathExists(path.join(targetDir, "yarn.lock"))) return "yarn";
-  if (await fs.pathExists(path.join(targetDir, "bun.lockb"))) return "bun";
+  if ((await fs.pathExists(path.join(targetDir, "bun.lock"))) || (await fs.pathExists(path.join(targetDir, "bun.lockb")))) return "bun";
   return "npm";
 }
 

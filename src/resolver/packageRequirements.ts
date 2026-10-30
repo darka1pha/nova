@@ -34,6 +34,26 @@ const COMPATIBLE_PINNED_PACKAGES = new Set<string>([
   "eslint",
   "postcss",
   "autoprefixer",
+  // UI libraries whose provider/config templates target a specific major
+  // (and, for daisyUI/HeroUI, a Tailwind v3-compatible line).
+  "antd",
+  "@mantine/core",
+  "@mantine/hooks",
+  "@heroui/react",
+  "daisyui",
+  "@headlessui/react",
+  // Plugin templates written against a specific major API.
+  "@trpc/server",
+  "@trpc/client",
+  "@trpc/react-query",
+  "@tanstack/react-query",
+  "@tanstack/react-query-devtools",
+  "storybook",
+  "@storybook/nextjs",
+  "@storybook/react",
+  "@storybook/addon-essentials",
+  "@storybook/addon-a11y",
+  "msw-storybook-addon",
 ]);
 
 /**
@@ -146,16 +166,22 @@ export function collectBaseRequirements(
       "@chakra-ui/react": "^3.36.1",
       "@emotion/react": "^11.14.0",
     },
-    ant: { antd: "^5.10.0" },
-    mantine: {
-      "@mantine/core": "^6.0.0",
-      "@mantine/hooks": "^6.0.0",
+    ant: {
+      antd: "^5.24.0",
+      "@ant-design/v5-patch-for-react-19": "^1.0.3",
     },
-    hero: { "@nextui-org/react": "^1.0.0" },
-    daisy: { daisyui: "^3.1.0" },
+    mantine: {
+      "@mantine/core": "^7.17.0",
+      "@mantine/hooks": "^7.17.0",
+    },
+    hero: {
+      "@heroui/react": "~2.7.0",
+      "framer-motion": "^11.18.0",
+    },
+    daisy: { daisyui: "^4.12.0" },
     headless: {
-      "@headlessui/react": "^1.8.0",
-      "@heroicons/react": "^2.0.18",
+      "@headlessui/react": "^2.2.0",
+      "@heroicons/react": "^2.2.0",
     },
   };
 

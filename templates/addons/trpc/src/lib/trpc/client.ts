@@ -20,7 +20,6 @@ export function getBaseUrl(): string {
 
 export function createTRPCClientConfig() {
   return {
-    transformer: superjson,
     links: [
       loggerLink({
         enabled: (opts) =>
@@ -28,6 +27,8 @@ export function createTRPCClientConfig() {
           (opts.direction === "down" && opts.result instanceof Error),
       }),
       httpBatchLink({
+        // tRPC v11 configures the transformer per link, not on the client.
+        transformer: superjson,
         url: `${getBaseUrl()}/api/trpc`,
         headers() {
           return {

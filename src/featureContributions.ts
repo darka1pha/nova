@@ -167,9 +167,9 @@ export const FEATURE_CONTRIBUTIONS: Record<FeatureKey, PackageAdditions> = {
   },
   trpc: {
     dependencies: {
-      "@trpc/server": "^10.45.2",
-      "@trpc/client": "^10.45.2",
-      "@trpc/react-query": "^10.45.2",
+      "@trpc/server": "^11.0.0",
+      "@trpc/client": "^11.0.0",
+      "@trpc/react-query": "^11.0.0",
       "@tanstack/react-query": "^5.62.11",
       superjson: "^2.2.2",
       "client-only": "^0.0.1",

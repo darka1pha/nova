@@ -1,6 +1,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 
+import { resolveDeploymentCommands } from "../packageManager.js";
 import type { DeploymentConfigOptions, DeploymentProvider, DeploymentResult } from "../types.js";
 
 export const renderProvider: DeploymentProvider = {
@@ -23,6 +24,7 @@ export const renderProvider: DeploymentProvider = {
     const filesWritten: string[] = [];
     const filesSkipped: string[] = [];
     const scriptsAdded: string[] = [];
+    const commands = await resolveDeploymentCommands(targetDir);
 
     // 1. render.yaml
     const renderYaml = `services:
@@ -30,9 +32,9 @@ export const renderProvider: DeploymentProvider = {
     name: nova-app
     runtime: node
     plan: starter
-    buildCommand: npm ci && npm run build
+    buildCommand: ${commands.bootstrapAndInstall} && ${commands.run("build")}
     startCommand: npm run start
-    healthCheckPath: /api/ready
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: 20.0.0

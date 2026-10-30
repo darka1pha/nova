@@ -1,11 +1,11 @@
 # --- deps ---
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* bun.lockb* ./
+COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* bun.lock* ./
 RUN corepack enable && \
   if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; \
   elif [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
-  elif [ -f bun.lockb ]; then bun install --frozen-lockfile; \
+  elif [ -f bun.lock ] || [ -f bun.lockb ]; then npm install -g bun && bun install --frozen-lockfile; \
   else npm ci; fi
 
 # --- build ---
@@ -14,7 +14,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# public/ is optional in Next.js but the runtime stage copies it.
+RUN mkdir -p public && npm run build
 
 # --- runtime ---
 FROM node:20-alpine AS runner

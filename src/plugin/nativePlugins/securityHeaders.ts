@@ -37,17 +37,19 @@ export const securityHeadersPlugin = definePlugin({
             "export default function proxy(request: NextRequest) {\n  return handleRouting(request);\n}",
             `export default async function proxy(request: NextRequest) {
   const response = await handleRouting(request);
-  try { applySecurityHeaders(response); } catch (e) { /* noop */ }
+  applySecurityHeaders(response);
   return response;
 }`,
           )
+          // Legacy (pre-proxy.ts) layout: the default export is the bare
+          // next-intl middleware with no NextRequest import yet.
           .replace(
             "export default createMiddleware(routing);",
             `const __nova_next_middleware = createMiddleware(routing);
 
-export default async function proxy(request) {
+export default async function proxy(request: import("next/server").NextRequest) {
   const response = await __nova_next_middleware(request);
-  try { applySecurityHeaders(response); } catch (e) { /* noop */ }
+  applySecurityHeaders(response);
   return response;
 }`,
           ),

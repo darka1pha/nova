@@ -33,7 +33,7 @@ export const railwayProvider: DeploymentProvider = {
       },
       deploy: {
         startCommand: "npm run start",
-        healthcheckPath: "/api/ready",
+        healthcheckPath: "/api/health",
         healthcheckTimeout: 120,
         restartPolicyType: "ON_FAILURE",
         restartPolicyMaxRetries: 5,

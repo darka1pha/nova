@@ -1,6 +1,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 
+import { resolveDeploymentCommands } from "../packageManager.js";
 import type { DeploymentConfigOptions, DeploymentProvider, DeploymentResult } from "../types.js";
 
 export const awsProvider: DeploymentProvider = {
@@ -23,6 +24,7 @@ export const awsProvider: DeploymentProvider = {
     const filesWritten: string[] = [];
     const filesSkipped: string[] = [];
     const scriptsAdded: string[] = [];
+    const commands = await resolveDeploymentCommands(targetDir);
 
     // 1. apprunner.yaml
     const apprunnerContent = `version: 1.0
@@ -30,8 +32,9 @@ runtime: nodejs20
 build:
   commands:
     build:
-      - npm ci
-      - npm run build
+${commands.bootstrap ? `      - ${commands.bootstrap}
+` : ""}      - ${commands.install}
+      - ${commands.run("build")}
 run:
   command: npm run start
   network:

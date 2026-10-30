@@ -1,6 +1,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 
+import { githubNodeCacheLine, resolveDeploymentCommands } from "../packageManager.js";
 import type { DeploymentConfigOptions, DeploymentProvider, DeploymentResult } from "../types.js";
 
 export const vercelProvider: DeploymentProvider = {
@@ -23,6 +24,7 @@ export const vercelProvider: DeploymentProvider = {
     const filesWritten: string[] = [];
     const filesSkipped: string[] = [];
     const scriptsAdded: string[] = [];
+    const commands = await resolveDeploymentCommands(targetDir);
 
     // 1. vercel.json
     const vercelConfig = {
@@ -30,7 +32,7 @@ export const vercelProvider: DeploymentProvider = {
       framework: "nextjs",
       buildCommand: "next build",
       devCommand: "next dev --turbopack",
-      installCommand: "npm install",
+      installCommand: commands.install,
       cleanUrls: true,
       headers: [
         {
@@ -74,19 +76,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+${commands.githubSetupSteps}      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 20${githubNodeCacheLine(commands)}
 
       - name: Install dependencies
-        run: npm ci
+        run: ${commands.install}
 
       - name: Run tests & typecheck
         run: |
-          npm run typecheck
-          npm test --if-present
+          ${commands.run("typecheck")}
+          npm run --if-present test
 
       - name: Deploy to Vercel (Preview or Production)
         uses: amondnet/vercel-action@v25

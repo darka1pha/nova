@@ -2,7 +2,8 @@
 
 DaisyUI is a Tailwind CSS plugin that provides utility-based component classes
 and theme presets. When selected, the generator will add `daisyui` as a dev
-dependency and document how to activate DaisyUI in tailwind.config.js.
+dependency and register the DaisyUI plugin in `tailwind.config.ts` automatically (daisyUI 4,
+the Tailwind v3-compatible line).
 
 Files added:
 

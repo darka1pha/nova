@@ -27,7 +27,7 @@ export function TRPCActionPanel() {
 
       <div className="mt-4 rounded-lg bg-muted/50 p-4">
         <p className="text-sm font-medium">Server Response:</p>
-        {helloQuery.isLoading ? (
+        {helloQuery.isPending ? (
           <p className="text-xs text-muted-foreground">Loading response...</p>
         ) : (
           <p className="text-sm text-primary font-mono mt-1">

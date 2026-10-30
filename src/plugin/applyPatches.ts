@@ -48,7 +48,9 @@ export async function applyPluginPatches(
 
       if (!(await fs.pathExists(targetPath))) continue;
 
-      const content = await fs.readFile(targetPath, "utf8");
+      // Transforms match on "\n"-joined snippets; normalize CRLF (e.g. a
+      // template checked out on Windows with core.autocrlf) so they apply.
+      const content = (await fs.readFile(targetPath, "utf8")).replace(/\r\n/g, "\n");
       if (patch.marker && content.includes(patch.marker)) continue; // already applied
 
       const next = patch.transform(content, ctx);

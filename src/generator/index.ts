@@ -223,6 +223,11 @@ export async function generateProject(
       await writeTailwindForDaisy(targetDir);
     }
 
+    if (uiLibrary === "hero") {
+      logger.step("Patching Tailwind config for HeroUI");
+      await writeTailwindForHero(targetDir);
+    }
+
     await runPluginHook("beforeComplete", enabledPluginIds, pluginRegistry, pluginContext);
 
     await patchReadme(targetDir, answers);
@@ -231,7 +236,7 @@ export async function generateProject(
     // Docker Compose generation (runtime-driven) — write docker-compose.yml
     if (answers.features.dockerCompose) {
       logger.step("Generating docker-compose.yml");
-      await generateDockerCompose(targetDir, answers.features);
+      await generateDockerCompose(targetDir, answers.features, pluginContext.answers);
     }
 
     await runPluginHook("afterComplete", enabledPluginIds, pluginRegistry, pluginContext);
@@ -259,6 +264,15 @@ export async function generateProject(
   return { targetDir, pluginRegistry, pluginContext };
 }
 
+/** UI-library providers that Storybook stories need wrapped around them. */
+const STORYBOOK_PROVIDERS: Partial<Record<UiLibrary, { name: string; module: string }>> = {
+  ant: { name: "AntProvider", module: "ant-provider" },
+  mantine: { name: "MantineProvider", module: "mantine-provider" },
+  hero: { name: "HeroProvider", module: "nextui-provider" },
+  chakra: { name: "ChakraAppProvider", module: "chakra-provider" },
+  mui: { name: "MuiProvider", module: "mui-provider" },
+};
+
 async function writeStorybookPreview(
   targetDir: string,
   uiLibrary: UiLibrary,
@@ -266,176 +280,102 @@ async function writeStorybookPreview(
 ) {
   const sbDir = path.join(targetDir, ".storybook");
   await fs.ensureDir(sbDir);
-  const previewPath = path.join(sbDir, "preview.ts");
 
-  // Default preview content — imports global styles and sets basic parameters
-  let content = `import type { Preview } from "@storybook/react";
+  const provider = STORYBOOK_PROVIDERS[uiLibrary];
 
-import "../src/styles/globals.css";
-
-const preview: Preview = {
-  parameters: {
-    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
-  },
-};
-
-export default preview;
-`;
-
-  // Provider-aware decorators per UI library override
-  if (uiLibrary === "ant") {
-    content = `import type { Preview } from "@storybook/react";
-import "../src/styles/globals.css";
-import React from "react";
-import { AntProvider } from "../src/providers/ant-provider";
-
-export const decorators = [
-  (Story) => (
-    <AntProvider>
-      <Story />
-    </AntProvider>
-  ),
-];
-
-const preview: Preview = {
-  parameters: {
-    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
-  },
-};
-
-export default preview;
-`;
-  } else if (uiLibrary === "mantine") {
-    content = `import type { Preview } from "@storybook/react";
-import "../src/styles/globals.css";
-import React from "react";
-import { MantineProvider } from "../src/providers/mantine-provider";
-
-export const decorators = [
-  (Story) => (
-    <MantineProvider>
-      <Story />
-    </MantineProvider>
-  ),
-];
-
-const preview: Preview = {
-  parameters: {
-    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
-  },
-};
-
-export default preview;
-`;
-  } else if (uiLibrary === "hero") {
-    content = `import type { Preview } from "@storybook/react";
-import "../src/styles/globals.css";
-import React from "react";
-import { HeroProvider } from "../src/providers/nextui-provider";
-
-export const decorators = [
-  (Story) => (
-    <HeroProvider>
-      <Story />
-    </HeroProvider>
-  ),
-];
-
-const preview: Preview = {
-  parameters: {
-    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
-  },
-};
-
-export default preview;
-`;
-  } else if (uiLibrary === "chakra") {
-    content = `import type { Preview } from "@storybook/react";
-import "../src/styles/globals.css";
-import React from "react";
-import { ChakraAppProvider } from "../src/providers/chakra-provider";
-
-export const decorators = [
-  (Story) => (
-    <ChakraAppProvider>
-      <Story />
-    </ChakraAppProvider>
-  ),
-];
-
-const preview: Preview = {
-  parameters: {
-    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
-  },
-};
-
-export default preview;
-`;
-  } else if (uiLibrary === "mui") {
-    content = `import type { Preview } from "@storybook/react";
-import "../src/styles/globals.css";
-import React from "react";
-import { MuiProvider } from "../src/providers/mui-provider";
-
-export const decorators = [
-  (Story) => (
-    <MuiProvider>
-      <Story />
-    </MuiProvider>
-  ),
-];
-
-const preview: Preview = {
-  parameters: {
-    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
-  },
-};
-
-export default preview;
-`;
+  // Written as .tsx because provider decorators contain JSX. The addon
+  // template ships a JSX-free preview.ts, which this replaces.
+  const imports = [
+    'import type { Preview } from "@storybook/react";',
+    "",
+    'import "../src/styles/globals.css";',
+  ];
+  if (provider) {
+    imports.push(`import { ${provider.name} } from "../src/providers/${provider.module}";`);
   }
-
-  // If MSW is enabled in features, initialize and include the MSW decorator
   if (features.msw) {
-    content = `import { initialize, mswDecorator } from "msw-storybook-addon";\n${content}\ninitialize();\n\nexport const decorators = [mswDecorator].concat((typeof decorators !== 'undefined') ? decorators : []);`;
+    imports.push('import { initialize, mswLoader } from "msw-storybook-addon";');
   }
 
-  await fs.writeFile(previewPath, content, "utf8");
-}
+  const body: string[] = [];
+  if (features.msw) body.push("initialize();", "");
 
-async function generateDockerCompose(targetDir: string, features: FeatureFlags) {
-  const services: string[] = [];
-
-  // app service (uses local Dockerfile if present)
-  services.push(
-    `  app:\n    build: .\n    ports:\n      - \"3000:3000\"\n    environment:\n      - NODE_ENV=development\n    depends_on:\n      - mailpit\n`,
+  body.push(
+    "const preview: Preview = {",
+    "  parameters: {",
+    "    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },",
+    "  },",
   );
-
-  if (features.prisma) {
-    services.push(
-      `  postgres:\n    image: postgres:15\n    environment:\n      - POSTGRES_PASSWORD=postgres\n    ports:\n      - \"5432:5432\"\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n`,
+  if (provider) {
+    body.push(
+      "  decorators: [",
+      "    (Story) => (",
+      `      <${provider.name}>`,
+      "        <Story />",
+      `      </${provider.name}>`,
+      "    ),",
+      "  ],",
     );
   }
+  if (features.msw) body.push("  loaders: [mswLoader],");
+  body.push("};", "", "export default preview;", "");
 
-  if (features.drizzle) {
+  await fs.remove(path.join(sbDir, "preview.ts"));
+  await fs.writeFile(
+    path.join(sbDir, "preview.tsx"),
+    `${imports.join("\n")}\n\n${body.join("\n")}`,
+    "utf8",
+  );
+}
+
+async function generateDockerCompose(
+  targetDir: string,
+  features: FeatureFlags,
+  pluginAnswers: PluginResolutionContext["answers"],
+) {
+  // Prisma/Drizzle conflict, so at most one Postgres service is ever needed.
+  const includePostgres =
+    features.prisma || features.drizzle || Boolean(pluginAnswers.dockerCompose?.includePostgres);
+
+  const services: string[] = [];
+  const dependsOn: string[] = [];
+  const appEnvironment = ["      - NODE_ENV=development"];
+
+  if (includePostgres) {
+    dependsOn.push("postgres");
+    appEnvironment.push("      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/app");
     services.push(
-      `  postgres:\n    image: postgres:15\n    environment:\n      - POSTGRES_PASSWORD=postgres\n    ports:\n      - \"5432:5432\"\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n`,
+      `  postgres:\n    image: postgres:16-alpine\n    environment:\n      - POSTGRES_USER=postgres\n      - POSTGRES_PASSWORD=postgres\n      - POSTGRES_DB=app\n    ports:\n      - "5432:5432"\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n`,
     );
   }
 
   if (features.redis) {
-    services.push(`  redis:\n    image: redis:7.2-alpine\n    ports:\n      - \"6379:6379\"\n`);
+    dependsOn.push("redis");
+    services.push(`  redis:\n    image: redis:7.2-alpine\n    ports:\n      - "6379:6379"\n`);
   }
 
   if (features.mailpit) {
+    dependsOn.push("mailpit");
     services.push(
-      `  mailpit:\n    image: axllent/mailpit:latest\n    ports:\n      - \"8025:8025\"\n      - \"1025:1025\"\n`,
+      `  mailpit:\n    image: axllent/mailpit:latest\n    ports:\n      - "8025:8025"\n      - "1025:1025"\n`,
     );
   }
 
-  const volumes = features.prisma || features.drizzle ? `\nvolumes:\n  pgdata:` : "";
+  // app service (uses local Dockerfile if present). It only depends on
+  // services that are actually defined above.
+  const app = [
+    "  app:",
+    "    build: .",
+    "    ports:",
+    '      - "3000:3000"',
+    "    environment:",
+    ...appEnvironment,
+    ...(dependsOn.length ? ["    depends_on:", ...dependsOn.map((name) => `      - ${name}`)] : []),
+    "",
+  ].join("\n");
 
-  const compose = `version: '3.8'\nservices:\n${services.join("\n")}${volumes}\n`;
+  const volumes = includePostgres ? "\nvolumes:\n  pgdata:\n" : "";
+  const compose = `services:\n${[app, ...services].join("\n")}${volumes}`;
 
   await fs.writeFile(path.join(targetDir, "docker-compose.yml"), compose, "utf8");
 }
@@ -445,28 +385,49 @@ async function writeTailwindForDaisy(targetDir: string) {
   if (!(await fs.pathExists(tailwindPath))) return;
   let content = await fs.readFile(tailwindPath, "utf8");
 
-  // Add daisyui import if missing
-  if (!content.includes("from 'daisyui'") && !content.includes("from \"daisyui\"")) {
-    content = content.replace(
-      /(import type \{ Config \} from \"tailwindcss\";\n\n)/,
-      `$1import daisyui from 'daisyui';\n\n`,
-    );
-  }
-
-  // Add daisyui plugin into plugins array
-  if (!content.includes("daisyui")) {
-    content = content.replace(/plugins: \[\],/, "plugins: [daisyui],");
-  }
+  content = addTailwindImport(content, 'import daisyui from "daisyui";');
+  content = addTailwindPlugin(content, "daisyui");
 
   // Add basic daisyui config if not present
-  if (!content.includes("daisyui:")) {
+  if (!/^\s*daisyui\s*:/m.test(content)) {
     content = content.replace(
-      /export default config;/,
-      `config.daisyui = { themes: ['light', 'dark'] };\n\nexport default config;`,
+      /^(\s*)plugins:\s*\[([^\]]*)\],/m,
+      `$1plugins: [$2],\n$1daisyui: { themes: ["light", "dark"] },`,
     );
   }
 
   await fs.writeFile(tailwindPath, content, "utf8");
+}
+
+/** HeroUI ships its component styles as a Tailwind plugin plus theme content. */
+async function writeTailwindForHero(targetDir: string) {
+  const tailwindPath = path.join(targetDir, "tailwind.config.ts");
+  if (!(await fs.pathExists(tailwindPath))) return;
+  let content = await fs.readFile(tailwindPath, "utf8");
+
+  content = addTailwindImport(content, 'import { heroui } from "@heroui/react";');
+  content = addTailwindPlugin(content, "heroui()");
+
+  const heroContent = "./node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
+  if (!content.includes(heroContent)) {
+    content = content.replace(/content:\s*\[/, `content: [\n    "${heroContent}",\n    `);
+  }
+
+  await fs.writeFile(tailwindPath, content, "utf8");
+}
+
+function addTailwindImport(content: string, importLine: string): string {
+  if (content.includes(importLine)) return content;
+  return content.replace(/(import type \{ Config \} from "tailwindcss";\r?\n)/, `$1${importLine}\n`);
+}
+
+/** Adds `entry` to the config's `plugins: [...]` array unless already present. */
+function addTailwindPlugin(content: string, entry: string): string {
+  return content.replace(/plugins:\s*\[([^\]]*)\]/, (match, existing: string) => {
+    if (existing.includes(entry)) return match;
+    const trimmed = existing.trim().replace(/,$/, "");
+    return `plugins: [${trimmed ? `${trimmed}, ${entry}` : entry}]`;
+  });
 }
 
 async function patchLintStaged(targetDir: string, features: FeatureFlags) {

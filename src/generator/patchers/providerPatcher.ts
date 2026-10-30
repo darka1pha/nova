@@ -23,6 +23,24 @@ const PROVIDER_CONTRIBUTIONS: ProviderContribution[] = [
     close: "</ChakraAppProvider>",
   },
   {
+    active: (ctx) => ctx.uiLibrary === "ant",
+    importLine: 'import { AntProvider } from "@/providers/ant-provider";',
+    open: "<AntProvider>",
+    close: "</AntProvider>",
+  },
+  {
+    active: (ctx) => ctx.uiLibrary === "mantine",
+    importLine: 'import { MantineProvider } from "@/providers/mantine-provider";',
+    open: "<MantineProvider>",
+    close: "</MantineProvider>",
+  },
+  {
+    active: (ctx) => ctx.uiLibrary === "hero",
+    importLine: 'import { HeroProvider } from "@/providers/nextui-provider";',
+    open: "<HeroProvider>",
+    close: "</HeroProvider>",
+  },
+  {
     active: (ctx) => ctx.features.trpc,
     importLine: 'import { TRPCProvider } from "@/lib/trpc/provider";',
     open: "<TRPCProvider>",

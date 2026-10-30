@@ -1,6 +1,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 
+import { githubNodeCacheLine, resolveDeploymentCommands } from "../packageManager.js";
 import type { DeploymentConfigOptions, DeploymentProvider, DeploymentResult } from "../types.js";
 
 export const cloudflareProvider: DeploymentProvider = {
@@ -23,6 +24,7 @@ export const cloudflareProvider: DeploymentProvider = {
     const filesWritten: string[] = [];
     const filesSkipped: string[] = [];
     const scriptsAdded: string[] = [];
+    const commands = await resolveDeploymentCommands(targetDir);
 
     // 1. wrangler.toml
     const wranglerContent = `name = "nova-app"
@@ -64,17 +66,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+${commands.githubSetupSteps}      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 20${githubNodeCacheLine(commands)}
 
       - name: Install dependencies
-        run: npm ci
+        run: ${commands.install}
 
       - name: Build Next.js app
-        run: npm run build
+        run: ${commands.run("build")}
 
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
