@@ -6,6 +6,45 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) co
 
 ---
 
+## [Unreleased]
+
+Fixes for generated projects that failed to compile, install, or run. See [`ROADMAP.md`](./ROADMAP.md) for what's next.
+
+### Fixed
+
+- **Mantine provider didn't compile.** `src/providers/mantine-provider.tsx` imported `MantineProvider` from `@mantine/core` and then declared its own `function MantineProvider`, so the name was defined twice. The local `@mantine/core` import is now aliased, the file is marked `"use client"`, and it loads `@mantine/core/styles.css`.
+- **Ant Design, Mantine, and HeroUI providers were never mounted.** `providerPatcher.ts` only wired MUI and Chakra into `app-providers.tsx`; the other three provider files were copied but unused, so their components failed at runtime. All five UI-library providers are now mounted. The Ant and Hero providers are also marked `"use client"`.
+- **Storybook preview was a syntax error with any UI library.** The generator wrote JSX provider decorators into `.storybook/preview.ts`, and with MSW enabled it declared `export const decorators` twice. It now writes a single `preview.tsx` with one `decorators` array and uses MSW's `mswLoader`.
+- **`nova add storybook` broke without MSW.** The addon's `preview.ts` always imported `msw-storybook-addon`, and `main.ts` listed it as an addon preset (which it isn't in v2). Both now work with or without MSW.
+- **DaisyUI was never enabled.** `writeTailwindForDaisy()` added `import daisyui` first, so its follow-up "is `daisyui` already in the file?" check always matched and `plugins: []` was never patched. The plugin and its `themes` config are now added reliably.
+- **docker-compose.yml was invalid in most setups.** `app` always had `depends_on: mailpit`, even without the Mailpit service, which also made the `nova add dockerCompose` template invalid. Generation now emits each service at most once, `app` only depends on services that exist, the Docker Compose plugin's `includePostgres` prompt answer is honored, and the obsolete `version:` key is removed. Postgres moved to `postgres:16-alpine` and the app service gets a matching `DATABASE_URL`.
+- **Docker builds failed on a fresh project.** Both the `docker` addon Dockerfile and `nova deploy docker`'s `Dockerfile.prod` copied `/app/public`, which the base template doesn't create. The builder stage now runs `mkdir -p public`. Bun projects failed too (corepack doesn't provide Bun on `node:20-alpine`); Bun is now installed explicitly, and the text `bun.lock` format is recognized alongside `bun.lockb`.
+- **`nova deploy docker` produced an image that couldn't start.** The image copies `.next/standalone`, which Next.js only emits with `output: "standalone"`, and the generated guide wrongly said the base template enabled it by default. The command now adds `output: "standalone"` to `next.config` (or tells you when it can't). Its Compose healthcheck now uses `/api/health`, which ships with the base template, instead of `/api/ready`, which only exists with the `health` plugin.
+- **Deployment configs assumed npm.** Vercel, Cloudflare, AWS App Runner, Render, and Docker configs hard-coded `npm ci` / `cache: npm`, which fail without a `package-lock.json`. They now use the project's package manager (from `.nova/project.json`, falling back to lockfile detection), including `pnpm/action-setup` / `oven-sh/setup-bun` steps in generated GitHub workflows. Railway and Render healthchecks now use `/api/health`.
+- **Security headers patch could leave `proxy.ts` half-applied.** Template files checked out with CRLF line endings (Windows `core.autocrlf`) made the patch add its import but skip wrapping `proxy()`. `applyPluginPatches()` now normalizes line endings before matching. The legacy middleware branch is now typed (`NextRequest`) instead of an implicit `any`, and header errors are no longer swallowed in the patch.
+- **Generated apps were versioned like the CLI.** Generated `package.json` files had `"version": "0.1.8"` (the CLI's version at the time). They now start at `0.1.0`.
+- Bun's text lockfile (`bun.lock`) is now detected by `nova add`, project manifest reconstruction, and the package-manager utilities.
+
+### Changed
+
+- **tRPC upgraded from v10 to v11.** tRPC v10's `@trpc/react-query` requires TanStack Query v4, but the plugin installed v5, which caused peer-dependency conflicts. The `superjson` transformer moved from the client config onto `httpBatchLink` (required in v11), and the demo panel uses `isPending`.
+- **HeroUI replaces NextUI.** The `hero` UI library now installs `@heroui/react` (pinned to `~2.7`, the last line that supports Tailwind v3) plus `framer-motion`, instead of the deprecated `@nextui-org/react@^1`. `tailwind.config.ts` is patched with the `heroui()` plugin and HeroUI's theme content path. Projects using `@nextui-org/react` are still detected as `hero`.
+- **The package resolver now keeps template-coupled packages within their declared range.** The resolver resolves most packages to npm's `latest` tag, which would cross majors that templates are written against. The UI libraries (`antd`, `@mantine/*`, `@heroui/react`, `daisyui`, `@headlessui/react`), tRPC, TanStack Query, and Storybook packages now resolve the newest release inside their declared range instead.
+- New internal helper `src/deployment/packageManager.ts` (`resolveDeploymentCommands`, `ensureStandaloneOutput`) shared by the deployment providers.
+
+### Dependencies
+
+| Package | Before | After | Why |
+|---|---|---|---|
+| `@trpc/server`, `@trpc/client`, `@trpc/react-query` | `^10.45.2` | `^11.0.0` | v10 requires TanStack Query v4 |
+| `@mantine/core`, `@mantine/hooks` | `^6.0.0` | `^7.17.0` | v6 doesn't support React 19 |
+| `@nextui-org/react` → `@heroui/react` | `^1.0.0` | `~2.7.0` (+ `framer-motion ^11.18.0`) | NextUI is deprecated; v1 doesn't support React 19 |
+| `antd` | `^5.10.0` | `^5.24.0` (+ `@ant-design/v5-patch-for-react-19`) | React 19 compatibility |
+| `daisyui` | `^3.1.0` | `^4.12.0` | Latest Tailwind v3-compatible line |
+| `@headlessui/react` | `^1.8.0` | `^2.2.0` | v1 doesn't support React 19 |
+
+---
+
 ## [0.2.4] - 2026-08-19
 
 ### Added

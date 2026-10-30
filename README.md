@@ -1638,6 +1638,8 @@ Because a feature's package.json contribution now lives in exactly one file (`sr
 
 ## Roadmap
 
+The detailed, release-by-release plan lives in [`ROADMAP.md`](./ROADMAP.md). Highlights:
+
 ### Recently Delivered
 
 - [x] **Vercel AI SDK & LLM Ecosystem** — Native plugins for Vercel AI SDK (`ai`, `openai`, `anthropic`, `ollama`), streaming route handlers, and chat UI components via `nova create --template ai` or `nova add ai`.
@@ -1693,7 +1695,7 @@ Prefer small, focused changes.
 
 ## Changelog
 
-See [`CHANGELOG.md`](./CHANGELOG.md) for a full history of changes to Nova itself (not the projects it generates).
+See [`changelog.md`](./changelog.md) for a full history of changes to Nova itself (not the projects it generates).
 
 ---
 
